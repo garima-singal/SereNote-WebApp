@@ -1,35 +1,23 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+// RouterProvider connects our router config to the React app
+import { RouterProvider } from 'react-router-dom'
 
-function App() {
-  const [count, setCount] = useState(0)
+// We import our router with all the routes defined
+import { router } from '@/router'
 
-  return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+// We import useAuth — calling it here at the top level means
+// it starts listening for auth changes as soon as the app loads
+// This means by the time any page renders, we already know
+// if the user is logged in or not
+import { useAuth } from '@/hooks/useAuth'
+
+const App = () => {
+    // This starts the Firebase auth listener for the whole app
+    // It updates authStore automatically on login/logout
+    useAuth()
+
+    // RouterProvider takes our router and renders the correct page
+    // based on the current URL
+    return <RouterProvider router={router} />
 }
 
 export default App
