@@ -5,6 +5,7 @@ import { WritePage } from '@/pages/WritePage'
 import { AppShell } from '@/components/layout/AppShell'
 import { useAuthStore } from '@/store/authStore'
 import { SettingsPage } from '@/pages/SettingsPage'
+import { TimelinePage } from '@/pages/TimelinePage'
 
 // ── PROTECTED ROUTE ──────────────────────────────────────────
 // Guards private pages — redirects to /auth if not logged in
@@ -65,15 +66,12 @@ export const router = createBrowserRouter([
                     </div>
                 ),
             },
+
             {
-                // Timeline / all entries — coming soon
                 path: 'timeline',
-                element: (
-                    <div className="p-8 text-ink font-lora text-xl">
-                        Timeline — coming soon
-                    </div>
-                ),
+                element: <TimelinePage />
             },
+
             {
                 // Settings — coming soon
                 path: 'settings',
