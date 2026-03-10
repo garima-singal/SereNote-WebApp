@@ -4,6 +4,7 @@ import { DashboardPage } from '@/pages/DashboardPage'
 import { WritePage } from '@/pages/WritePage'
 import { AppShell } from '@/components/layout/AppShell'
 import { useAuthStore } from '@/store/authStore'
+import { SettingsPage } from '@/pages/SettingsPage'
 
 // ── PROTECTED ROUTE ──────────────────────────────────────────
 // Guards private pages — redirects to /auth if not logged in
@@ -76,11 +77,7 @@ export const router = createBrowserRouter([
             {
                 // Settings — coming soon
                 path: 'settings',
-                element: (
-                    <div className="p-8 text-ink font-lora text-xl">
-                        Settings — coming soon
-                    </div>
-                ),
+                element: <SettingsPage />
             },
             {
                 // Profile — coming soon
