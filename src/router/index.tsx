@@ -8,6 +8,7 @@ import { SettingsPage } from '@/pages/SettingsPage'
 import { TimelinePage } from '@/pages/TimelinePage'
 import { ProfilePage } from '@/pages/ProfilePage'
 import { BookmarksPage } from '@/pages/BookmarksPage'
+import { InsightsPage } from '@/pages/InsightsPage'
 
 // ── PROTECTED ROUTE ──────────────────────────────────────────
 // Guards private pages — redirects to /auth if not logged in
@@ -83,11 +84,7 @@ export const router = createBrowserRouter([
             {
                 // Insights — coming soon
                 path: 'insights',
-                element: (
-                    <div className="p-8 text-ink font-lora text-xl">
-                        Insights — coming soon
-                    </div>
-                ),
+                element: <InsightsPage />
             },
             {
                 // Search — coming soon
