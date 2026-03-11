@@ -1,37 +1,27 @@
-// useEffect runs code when the component mounts/unmounts
 import { useEffect } from 'react'
-
-// We import our Zustand store to update global auth state
+import { onAuthChange } from '@/services/firebase/auth'
+import { createUserDocument } from '@/services/firebase/users'
 import { useAuthStore } from '@/store/authStore'
 
-// We import our listener function from the auth service
-import { onAuthChange } from '@/services/firebase/auth'
-
-// This is a custom hook — a reusable function that wraps
-// Firebase's auth listener and keeps Zustand in sync
+// Listens to Firebase Auth state changes and syncs to Zustand store.
+// Also ensures the Firestore user document exists on every session restore —
+// this handles the case where Firestore data was deleted but Auth was not.
 export const useAuth = () => {
-    // We pull setUser and setLoading from the store
-    // These let us update global state from inside this hook
     const { setUser, setLoading } = useAuthStore()
 
     useEffect(() => {
-        // onAuthChange fires immediately when called —
-        // it checks if a user is already logged in (e.g. from yesterday)
-        // Then it keeps listening and fires again on every login/logout
-        const unsubscribe = onAuthChange((firebaseUser) => {
-            // Update the global user state with whoever is logged in (or null)
-            setUser(firebaseUser)
-
-            // We're done checking — set loading to false
-            // This tells the app it's safe to show the UI
+        const unsubscribe = onAuthChange(async (user) => {
+            if (user) {
+                // Re-create user document if it was deleted from Firestore
+                // createUserDocument is idempotent — skips if doc already exists
+                await createUserDocument(user)
+                setUser(user)
+            } else {
+                setUser(null)
+            }
             setLoading(false)
         })
 
-        // This is the cleanup function — React calls this when the
-        // component using this hook unmounts (e.g. navigating away)
-        // It stops the Firebase listener to prevent memory leaks
         return () => unsubscribe()
-
-        // Empty array [] means this effect runs ONCE when the app first loads
     }, [setUser, setLoading])
 }

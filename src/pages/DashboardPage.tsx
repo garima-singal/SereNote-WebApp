@@ -313,7 +313,7 @@ export const DashboardPage = () => {
                         "{prompt}"
                     </div>
                     <button
-                        onClick={() => navigate('/write')}
+                        onClick={() => navigate(`/write?prompt=${encodeURIComponent(prompt)}`)}
                         className="text-xs text-terra font-medium hover:underline
                        transition-colors"
                     >

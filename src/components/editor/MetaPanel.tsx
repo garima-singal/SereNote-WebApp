@@ -20,7 +20,7 @@ export const MetaPanel = ({
     const [tagInput, setTagInput] = useState('')
     const inputRef = useRef<HTMLInputElement>(null)
 
-    const readingTime = Math.max(1, Math.ceil(wordCount / 200))
+    const readingTime = wordCount === 0 ? null : Math.max(1, Math.ceil(wordCount / 50))
 
     // Toggle a mood on/off
     const toggleMood = (m: MoodType) => {
@@ -55,7 +55,7 @@ export const MetaPanel = ({
                 <div className="grid grid-cols-2 gap-2">
                     {[
                         { label: 'Words', value: wordCount.toLocaleString() },
-                        { label: 'Reading', value: `~${readingTime} min` },
+                        { label: 'Reading', value: readingTime ? `~${readingTime} min` : '—' },
                     ].map(s => (
                         <div key={s.label}
                             className="bg-surface rounded-xl p-2.5 text-center">

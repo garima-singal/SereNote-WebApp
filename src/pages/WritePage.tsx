@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useAuthStore } from '@/store/authStore'
 import { createEntry, updateEntry, getEntry } from '@/services/firebase/entries'
@@ -17,10 +17,13 @@ export const WritePage = () => {
     const { entryId } = useParams<{ entryId?: string }>()
     const { user } = useAuthStore()
     const navigate = useNavigate()
+    const [searchParams] = useSearchParams()
 
     // Core entry state
     const [docId, setDocId] = useState<string | null>(entryId ?? null)
-    const [title, setTitle] = useState('')
+    // Pre-fill title from prompt query param if starting a new entry
+    const promptFromUrl = searchParams.get('prompt') ?? ''
+    const [title, setTitle] = useState(promptFromUrl)
     const [body, setBody] = useState('')
     const [bodyText, setBodyText] = useState('')
     const [moods, setMoods] = useState<MoodType[]>([])
@@ -73,6 +76,7 @@ export const WritePage = () => {
         t: string, b: string, bt: string,
         m: MoodType[], tg: string[], wc: number,
         id: string | null,
+        isManual = false,
     ) => {
         if (!user) return
         setSaveStatus('saving')
@@ -91,12 +95,17 @@ export const WritePage = () => {
                 window.history.replaceState(null, '', `/write/${newId}`)
             }
             setSaveStatus('saved')
-            setTimeout(() => setSaveStatus('idle'), 2000)
+            if (isManual) {
+                toast.success('Entry saved!')
+                setTimeout(() => navigate('/timeline'), 500)
+            } else {
+                setTimeout(() => setSaveStatus('idle'), 2000)
+            }
         } catch {
             setSaveStatus('error')
             toast.error('Failed to save entry.')
         }
-    }, [user])
+    }, [user, navigate])
 
     // ── DEBOUNCED AUTOSAVE ────────────────────────────────────
     const scheduleAutoSave = useCallback((
@@ -191,16 +200,6 @@ export const WritePage = () => {
                     {/* Right — controls */}
                     <div className="flex items-center gap-2 flex-wrap justify-end">
 
-                        {/* Save status */}
-                        <span className={`text-[11px] transition-all ${saveStatus === 'saving' ? 'text-muted animate-pulse' :
-                            saveStatus === 'saved' ? 'text-accent' :
-                                saveStatus === 'error' ? 'text-terra' : 'text-transparent'
-                            }`}>
-                            {saveStatus === 'saving' ? 'Saving…' :
-                                saveStatus === 'saved' ? '✓ Saved' :
-                                    saveStatus === 'error' ? 'Error' : '·'}
-                        </span>
-
                         {/* Word count + goal */}
                         <div className="relative">
                             <button
@@ -255,15 +254,22 @@ export const WritePage = () => {
                             </button>
                         )}
 
-                        {/* Focus mode */}
+                        {/* Meta panel toggle */}
+                        {/* Save button */}
                         <button
-                            onClick={() => setFocusMode(true)}
-                            title="Focus mode (Esc to exit)"
-                            className="text-xs px-2.5 py-1 rounded-lg border border-border
-                         text-muted hover:text-ink hover:border-ink2
-                         transition-colors"
+                            onClick={() => save(title, body, bodyText, moods, tags, wordCount, docId, true)}
+                            disabled={saveStatus === 'saving'}
+                            className={`text-xs px-3.5 py-1.5 rounded-lg font-medium
+                         transition-all disabled:opacity-50 disabled:cursor-not-allowed ${saveStatus === 'saved'
+                                    ? 'bg-accent-pale text-accent border border-accent'
+                                    : saveStatus === 'error'
+                                        ? 'bg-terra-pale text-terra border border-terra/30'
+                                        : 'bg-ink text-bg hover:opacity-85 border border-ink'
+                                }`}
                         >
-                            ⛶ Focus
+                            {saveStatus === 'saving' ? 'Saving…' :
+                                saveStatus === 'saved' ? '✓ Saved' :
+                                    saveStatus === 'error' ? 'Error' : 'Save'}
                         </button>
 
                         {/* Meta panel toggle */}

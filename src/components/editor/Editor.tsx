@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useRef } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -11,7 +11,7 @@ import TextAlign from '@tiptap/extension-text-align'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import Image from '@tiptap/extension-image'
-import Link from '@tiptap/extension-link'
+import { FontFamily } from '@tiptap/extension-font-family'
 import { EditorToolbar } from './EditorToolbar'
 
 interface EditorProps {
@@ -30,6 +30,19 @@ export const Editor = ({
     onBodyChange,
 }: EditorProps) => {
 
+    const titleRef = useRef<HTMLTextAreaElement>(null)
+
+    // Auto-resize textarea height as content grows
+    const resizeTitle = useCallback(() => {
+        const el = titleRef.current
+        if (!el) return
+        el.style.overflowY = 'hidden'
+        el.style.height = 'auto'
+        el.style.height = `${el.scrollHeight}px`
+    }, [])
+
+    useEffect(() => { resizeTitle() }, [title, resizeTitle])
+
     const editor = useEditor({
         extensions: [
             StarterKit.configure({
@@ -47,9 +60,8 @@ export const Editor = ({
             TaskList,
             TaskItem.configure({ nested: true }),
             Image.configure({ inline: false, allowBase64: true }),
-            Link.configure({
-                openOnClick: true,
-                HTMLAttributes: { class: 'prose-link' },
+            FontFamily.configure({
+                types: ['textStyle'],
             }),
         ],
         content: body || '',
@@ -93,24 +105,26 @@ export const Editor = ({
         <div className={`transition-all duration-300 ${focusMode ? 'max-w-xl' : 'max-w-2xl'
             } mx-auto px-4 sm:px-6 py-6 sm:py-8`}>
 
-            {/* Title */}
-            <input
-                type="text"
+            {/* Title — textarea auto-resizes for long prompts */}
+            <textarea
+                ref={titleRef}
                 value={title}
-                onChange={e => onTitleChange(e.target.value)}
+                onChange={e => { onTitleChange(e.target.value); resizeTitle() }}
                 placeholder="Entry title…"
+                rows={1}
                 className={`w-full font-lora bg-transparent outline-none border-none
-                   placeholder:text-muted/40 mb-5 leading-tight
-                   transition-all duration-300
+                   placeholder:text-muted/40 mb-5 leading-tight resize-none
+                   block transition-all duration-300
                    ${focusMode
                         ? 'text-2xl sm:text-3xl font-semibold text-ink'
                         : 'text-xl sm:text-2xl lg:text-3xl font-semibold text-ink'
                     }`}
+                style={{ height: 'auto', overflowY: 'hidden' }}
             />
 
             {/* Toolbar — hidden in focus mode */}
             {editor && !focusMode && (
-                <div className="overflow-x-auto mb-1">
+                <div className="mb-3">
                     <EditorToolbar editor={editor} onImageUpload={handleImageUpload} />
                 </div>
             )}
