@@ -81,8 +81,13 @@ export const updateEntry = async (
     data: Partial<Entry>
 ): Promise<void> => {
     const ref = doc(db, 'users', uid, 'entries', entryId)
+
+    // Strip out computed/readonly fields that should never be written back
+    // createdAt is set once on create and must not be overwritten with a JS Date
+    const { id, createdAt, deletedAt, ...rest } = data as any
+
     await updateDoc(ref, {
-        ...data,
+        ...rest,
         updatedAt: serverTimestamp(),
     })
 }
