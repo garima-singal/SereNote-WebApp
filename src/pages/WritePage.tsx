@@ -1,19 +1,24 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import { useAuthStore } from '@/store/authStore'
 import { createEntry, updateEntry, getEntry } from '@/services/firebase/entries'
+import { useBookmark } from '@/hooks/useBookmark'
 import { Editor } from '@/components/editor/Editor'
 import { MetaPanel } from '@/components/editor/MetaPanel'
 import type { MoodType } from '@/types/entry'
-import { useBookmark } from '@/hooks/useBookmark'
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
+
+// Word goal options
+const WORD_GOALS = [0, 100, 200, 300, 500, 750, 1000]
 
 export const WritePage = () => {
     const { entryId } = useParams<{ entryId?: string }>()
     const { user } = useAuthStore()
     const navigate = useNavigate()
 
+    // Core entry state
     const [docId, setDocId] = useState<string | null>(entryId ?? null)
     const [title, setTitle] = useState('')
     const [body, setBody] = useState('')
@@ -21,12 +26,21 @@ export const WritePage = () => {
     const [moods, setMoods] = useState<MoodType[]>([])
     const [tags, setTags] = useState<string[]>([])
     const [wordCount, setWordCount] = useState(0)
-    const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
-    const [initialized, setInitialized] = useState(false)
-    const [metaOpen, setMetaOpen] = useState(false)
-    const { isBookmarked, toggle: toggleBookmark } = useBookmark(entryId)
 
-    // Load existing entry
+    // UI state
+    const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
+    const [metaOpen, setMetaOpen] = useState(true)
+    const [focusMode, setFocusMode] = useState(false)
+    const [wordGoal, setWordGoal] = useState(0)
+    const [showGoalPick, setShowGoalPick] = useState(false)
+    const [initialized, setInitialized] = useState(false)
+
+    const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+    // Bookmark
+    const { isBookmarked, toggle: toggleBookmark } = useBookmark(docId ?? '')
+
+    // ── LOAD EXISTING ENTRY ───────────────────────────────────
     useEffect(() => {
         if (!entryId || !user) { setInitialized(true); return }
         const load = async () => {
@@ -35,7 +49,6 @@ export const WritePage = () => {
                 setTitle(entry.title)
                 setBody(entry.body)
                 setBodyText(entry.bodyText)
-                // Support both old single mood and new multiple moods
                 setMoods(entry.moods ?? [])
                 setTags(entry.tags)
                 setWordCount(entry.wordCount)
@@ -46,72 +59,79 @@ export const WritePage = () => {
         load()
     }, [entryId, user])
 
-    // Core save function
+    // ── FOCUS MODE — Escape to exit ───────────────────────────
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && focusMode) setFocusMode(false)
+        }
+        window.addEventListener('keydown', handler)
+        return () => window.removeEventListener('keydown', handler)
+    }, [focusMode])
+
+    // ── SAVE ──────────────────────────────────────────────────
     const save = useCallback(async (
-        newTitle: string, newBody: string, newBodyText: string,
-        newMoods: MoodType[], newTags: string[],
-        newWc: number, currentDocId: string | null,
+        t: string, b: string, bt: string,
+        m: MoodType[], tg: string[], wc: number,
+        id: string | null,
     ) => {
         if (!user) return
         setSaveStatus('saving')
         try {
             const data = {
-                title: newTitle, body: newBody, bodyText: newBodyText,
-                moods: newMoods,
-                // Keep legacy mood field as first mood for backwards compat
-                mood: newMoods[0] ?? null,
-                tags: newTags, wordCount: newWc,
+                title: t, body: b, bodyText: bt,
+                moods: m, tags: tg, wordCount: wc,
                 status: 'published' as const,
             }
-            if (currentDocId) {
-                await updateEntry(user.uid, currentDocId, data)
-            } else {
-                const id = await createEntry(user.uid)
+            if (id) {
                 await updateEntry(user.uid, id, data)
-                setDocId(id)
-                window.history.replaceState(null, '', `/write/${id}`)
+            } else {
+                const newId = await createEntry(user.uid)
+                await updateEntry(user.uid, newId, data)
+                setDocId(newId)
+                window.history.replaceState(null, '', `/write/${newId}`)
             }
             setSaveStatus('saved')
             setTimeout(() => setSaveStatus('idle'), 2000)
         } catch {
             setSaveStatus('error')
+            toast.error('Failed to save entry.')
         }
     }, [user])
 
-    // Debounced auto-save
-    const [saveTimer, setSaveTimer] = useState<ReturnType<typeof setTimeout> | null>(null)
+    // ── DEBOUNCED AUTOSAVE ────────────────────────────────────
     const scheduleAutoSave = useCallback((
         t: string, b: string, bt: string,
-        m: MoodType[], tg: string[], wc: number, id: string | null,
+        m: MoodType[], tg: string[], wc: number,
+        id: string | null,
     ) => {
-        if (saveTimer) clearTimeout(saveTimer)
-        const timer = setTimeout(() => save(t, b, bt, m, tg, wc, id), 2000)
-        setSaveTimer(timer)
-    }, [save, saveTimer])
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+        saveTimerRef.current = setTimeout(() => {
+            save(t, b, bt, m, tg, wc, id)
+        }, 2000)
+    }, [save])
 
+    // ── HANDLERS ─────────────────────────────────────────────
     const handleTitleChange = (v: string) => {
         setTitle(v)
         scheduleAutoSave(v, body, bodyText, moods, tags, wordCount, docId)
     }
-    const handleBodyChange = (html: string, text: string, wc: number) => {
-        setBody(html); setBodyText(text); setWordCount(wc)
-        scheduleAutoSave(title, html, text, moods, tags, wc, docId)
-    }
-    const handleMoodsChange = (newMoods: MoodType[]) => {
-        setMoods(newMoods)
-        scheduleAutoSave(title, body, bodyText, newMoods, tags, wordCount, docId)
-    }
-    const handleTagsChange = (newTags: string[]) => {
-        setTags(newTags)
-        scheduleAutoSave(title, body, bodyText, moods, newTags, wordCount, docId)
+
+    const handleBodyChange = (b: string, bt: string, wc: number) => {
+        setBody(b); setBodyText(bt); setWordCount(wc)
+        scheduleAutoSave(title, b, bt, moods, tags, wc, docId)
     }
 
-    // Manual save handler
-    const handleManualSave = () => {
-        save(title, body, bodyText, moods, tags, wordCount, docId)
+    const handleMoodsChange = (m: MoodType[]) => {
+        setMoods(m)
+        scheduleAutoSave(title, body, bodyText, m, tags, wordCount, docId)
     }
 
-    // Ctrl+S
+    const handleTagsChange = (tg: string[]) => {
+        setTags(tg)
+        scheduleAutoSave(title, body, bodyText, moods, tg, wordCount, docId)
+    }
+
+    // ── Ctrl+S ────────────────────────────────────────────────
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
             if ((e.ctrlKey || e.metaKey) && e.key === 's') {
@@ -123,137 +143,219 @@ export const WritePage = () => {
         return () => window.removeEventListener('keydown', handler)
     }, [title, body, bodyText, moods, tags, wordCount, docId, save])
 
+    // ── WORD GOAL PROGRESS ────────────────────────────────────
+    const goalProgress = wordGoal > 0
+        ? Math.min(100, Math.round((wordCount / wordGoal) * 100))
+        : 0
+    const goalReached = wordGoal > 0 && wordCount >= wordGoal
+
+    // Notify when goal is first reached
+    const prevGoalReached = useRef(false)
+    useEffect(() => {
+        if (goalReached && !prevGoalReached.current) {
+            toast.success(`🎉 Goal reached! ${wordGoal} words written.`)
+        }
+        prevGoalReached.current = goalReached
+    }, [goalReached, wordGoal])
+
     if (!initialized) {
         return (
-            <div className="flex items-center justify-center h-full text-muted text-sm">
-                Loading...
+            <div className="flex items-center justify-center h-full">
+                <div className="flex flex-col items-center gap-3">
+                    <div className="w-5 h-5 border-2 border-accent border-t-transparent
+                          rounded-full animate-spin" />
+                    <span className="text-xs text-muted">Loading entry…</span>
+                </div>
             </div>
         )
     }
 
     return (
-        <div className="flex flex-col h-full">
+        <div className={`flex flex-col h-full transition-colors duration-300
+                     ${focusMode ? 'bg-[#FDFAF6]' : 'bg-bg'}`}>
 
             {/* ── TOP BAR ── */}
-            <div className="flex items-center justify-between px-4 py-2.5
-                      border-b border-border bg-card shrink-0 gap-2">
-                <button
-                    onClick={() => navigate('/')}
-                    className="flex items-center gap-1 text-xs text-muted
-                     hover:text-ink transition-colors shrink-0"
-                >
-                    ← <span className="hidden sm:inline">Dashboard</span>
-                </button>
+            {!focusMode && (
+                <div className="flex items-center justify-between px-4 sm:px-5 py-3
+                        border-b border-border bg-card shrink-0 gap-3">
 
-                {/* Save status indicator */}
-                <span className={`text-[11px] transition-all ${saveStatus === 'saving' ? 'text-muted' :
-                    saveStatus === 'saved' ? 'text-accent' :
-                        saveStatus === 'error' ? 'text-terra' : 'text-transparent'
-                    }`}>
-                    {saveStatus === 'saving' ? 'Saving...' :
-                        saveStatus === 'saved' ? '✓ Saved' :
-                            saveStatus === 'error' ? 'Error saving' : '·'}
-                </span>
-
-                <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-[11px] text-muted hidden sm:inline">
-                        {wordCount} {wordCount === 1 ? 'word' : 'words'}
-                    </span>
-                    {/* Details toggle — prominent */}
+                    {/* Left — back */}
                     <button
-                        onClick={() => setMetaOpen(o => !o)}
-                        className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors ${metaOpen
-                            ? 'border-accent bg-accent-pale text-accent'
-                            : 'border-accent bg-accent text-white hover:opacity-90'
-                            }`}
+                        onClick={() => navigate('/')}
+                        className="flex items-center gap-1.5 text-xs text-muted
+                       hover:text-ink transition-colors shrink-0"
                     >
-                        {metaOpen ? '← Hide' : '✦ Details'}
+                        ← Dashboard
                     </button>
-                    <button
-                        onClick={toggleBookmark}
-                        title={isBookmarked ? 'Remove bookmark' : 'Bookmark this entry'}
-                        className={`p-2 rounded-xl border transition-colors ${isBookmarked
-                            ? 'bg-gold/10 text-gold border-gold/30'
-                            : 'border-border text-muted hover:text-ink'
+
+                    {/* Right — controls */}
+                    <div className="flex items-center gap-2 flex-wrap justify-end">
+
+                        {/* Save status */}
+                        <span className={`text-[11px] transition-all ${saveStatus === 'saving' ? 'text-muted animate-pulse' :
+                            saveStatus === 'saved' ? 'text-accent' :
+                                saveStatus === 'error' ? 'text-terra' : 'text-transparent'
+                            }`}>
+                            {saveStatus === 'saving' ? 'Saving…' :
+                                saveStatus === 'saved' ? '✓ Saved' :
+                                    saveStatus === 'error' ? 'Error' : '·'}
+                        </span>
+
+                        {/* Word count + goal */}
+                        <div className="relative">
+                            <button
+                                onClick={() => setShowGoalPick(v => !v)}
+                                title="Set word goal"
+                                className={`text-[11px] px-2 py-1 rounded-lg border transition-colors ${wordGoal > 0
+                                    ? goalReached
+                                        ? 'border-accent bg-accent-pale text-accent'
+                                        : 'border-gold/40 bg-gold/10 text-gold'
+                                    : 'border-transparent text-muted hover:text-ink'
+                                    }`}
+                            >
+                                {wordCount} {wordCount === 1 ? 'word' : 'words'}
+                                {wordGoal > 0 && ` / ${wordGoal}`}
+                            </button>
+
+                            {/* Goal picker dropdown */}
+                            {showGoalPick && (
+                                <div className="absolute top-full right-0 mt-1 z-50 bg-card
+                                border border-border rounded-xl shadow-lg p-2
+                                min-w-[130px]">
+                                    <div className="text-[10px] font-semibold text-muted uppercase
+                                  tracking-wider mb-1.5 px-1">Word goal</div>
+                                    {WORD_GOALS.map(g => (
+                                        <button
+                                            key={g}
+                                            onClick={() => { setWordGoal(g); setShowGoalPick(false) }}
+                                            className={`w-full text-left px-2 py-1.5 rounded-lg text-xs
+                                  transition-colors ${wordGoal === g
+                                                    ? 'bg-accent-pale text-accent font-medium'
+                                                    : 'text-ink hover:bg-surface'
+                                                }`}
+                                        >
+                                            {g === 0 ? 'No goal' : `${g} words`}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Bookmark */}
+                        {docId && (
+                            <button
+                                onClick={toggleBookmark}
+                                title={isBookmarked ? 'Remove bookmark' : 'Bookmark'}
+                                className={`text-sm px-2 py-1 rounded-lg border transition-colors ${isBookmarked
+                                    ? 'border-gold/40 bg-gold/10 text-gold'
+                                    : 'border-border text-muted hover:text-ink'
+                                    }`}
+                            >
+                                {isBookmarked ? '★' : '☆'}
+                            </button>
+                        )}
+
+                        {/* Focus mode */}
+                        <button
+                            onClick={() => setFocusMode(true)}
+                            title="Focus mode (Esc to exit)"
+                            className="text-xs px-2.5 py-1 rounded-lg border border-border
+                         text-muted hover:text-ink hover:border-ink2
+                         transition-colors"
+                        >
+                            ⛶ Focus
+                        </button>
+
+                        {/* Meta panel toggle */}
+                        <button
+                            onClick={() => setMetaOpen(o => !o)}
+                            className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${metaOpen
+                                ? 'border-accent bg-accent-pale text-accent'
+                                : 'border-border text-muted hover:text-ink'
+                                }`}
+                        >
+                            {metaOpen ? 'Hide details' : 'Details'}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* ── WORD GOAL PROGRESS BAR ── */}
+            {wordGoal > 0 && !focusMode && (
+                <div className="h-0.5 bg-border shrink-0">
+                    <div
+                        className={`h-full transition-all duration-500 ${goalReached ? 'bg-accent' : 'bg-gold'
                             }`}
+                        style={{ width: `${goalProgress}%` }}
+                    />
+                </div>
+            )}
+
+            {/* ── FOCUS MODE OVERLAY CONTROLS ── */}
+            {focusMode && (
+                <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
+                    <span className="text-xs text-muted/60 bg-white/60 backdrop-blur-sm
+                           px-2.5 py-1 rounded-lg">
+                        {wordCount} words
+                        {wordGoal > 0 && ` / ${wordGoal}`}
+                    </span>
+                    <button
+                        onClick={() => setFocusMode(false)}
+                        className="text-xs text-muted/60 bg-white/60 backdrop-blur-sm
+                       hover:text-ink hover:bg-white/80 px-2.5 py-1
+                       rounded-lg transition-all"
                     >
-                        {isBookmarked ? '◈' : '◇'}
+                        Esc · Exit focus
                     </button>
                 </div>
-            </div>
+            )}
 
-            {/* ── SPLIT BODY ── */}
-            <div className="flex flex-1 overflow-hidden relative">
+            {/* ── SPLIT LAYOUT ── */}
+            <div className="flex flex-1 overflow-hidden">
 
                 {/* Editor */}
-                <div className="flex-1 overflow-y-auto flex flex-col">
-                    <div className="flex-1">
-                        <Editor
-                            title={title}
-                            body={body}
-                            onTitleChange={handleTitleChange}
-                            onBodyChange={handleBodyChange}
-                        />
-                    </div>
-
-                    {/* ── SAVE BUTTON — bottom of editor ── */}
-                    <div className="px-4 sm:px-6 py-4 max-w-2xl mx-auto w-full">
-                        <button
-                            onClick={handleManualSave}
-                            disabled={saveStatus === 'saving'}
-                            className="w-full py-3 bg-ink text-bg rounded-xl text-sm
-                         font-medium hover:opacity-85 transition-opacity
-                         disabled:opacity-50 disabled:cursor-not-allowed
-                         flex items-center justify-center gap-2"
-                        >
-                            {saveStatus === 'saving' ? (
-                                <>
-                                    <span className="animate-pulse">●</span>
-                                    Saving...
-                                </>
-                            ) : saveStatus === 'saved' ? (
-                                <>✓ Saved</>
-                            ) : (
-                                <>Save Entry</>
-                            )}
-                        </button>
-                        <p className="text-[10px] text-muted text-center mt-2">
-                            Auto-saves every 2 seconds · Ctrl+S to save manually
-                        </p>
-                    </div>
+                <div className={`flex-1 overflow-y-auto transition-all duration-300
+                         ${focusMode ? 'focus-mode' : ''}`}>
+                    <Editor
+                        title={title}
+                        body={body}
+                        focusMode={focusMode}
+                        onTitleChange={handleTitleChange}
+                        onBodyChange={handleBodyChange}
+                    />
                 </div>
 
-                {/* ── META PANEL ── */}
-                {metaOpen && (
-                    <>
-                        {/* Mobile backdrop */}
-                        <div
-                            className="fixed inset-0 z-20 bg-ink/20 lg:hidden"
-                            onClick={() => setMetaOpen(false)}
+                {/* Meta panel — hidden in focus mode */}
+                {metaOpen && !focusMode && (
+                    <div className="w-[240px] shrink-0 border-l border-border
+                          overflow-y-auto bg-card hidden sm:block">
+                        <MetaPanel
+                            moods={moods}
+                            tags={tags}
+                            wordCount={wordCount}
+                            onMoodsChange={handleMoodsChange}
+                            onTagsChange={handleTagsChange}
                         />
-                        {/* Panel — bottom sheet on mobile, side panel on desktop */}
-                        <div className="
-              fixed bottom-0 left-0 right-0 z-30
-              max-h-[75vh] overflow-y-auto
-              bg-card border-t border-border rounded-t-2xl shadow-xl
-              lg:static lg:w-[300px] lg:max-h-none
-              lg:border-t-0 lg:border-l lg:rounded-none lg:shadow-none lg:z-auto
-            ">
-                            {/* Mobile drag handle */}
-                            <div className="flex justify-center pt-3 pb-1 lg:hidden">
-                                <div className="w-8 h-1 bg-border rounded-full" />
-                            </div>
-                            <MetaPanel
-                                moods={moods}
-                                tags={tags}
-                                wordCount={wordCount}
-                                onMoodsChange={handleMoodsChange}
-                                onTagsChange={handleTagsChange}
-                            />
-                        </div>
-                    </>
+                    </div>
                 )}
 
+                {/* Mobile meta panel — bottom sheet */}
+                {metaOpen && !focusMode && (
+                    <div className="sm:hidden fixed bottom-0 left-0 right-0 z-30
+                          bg-card border-t border-border rounded-t-2xl
+                          shadow-lg max-h-[45vh] overflow-y-auto">
+                        <div className="flex justify-center pt-2 pb-1">
+                            <div className="w-8 h-1 bg-border rounded-full" />
+                        </div>
+                        <MetaPanel
+                            moods={moods}
+                            tags={tags}
+                            wordCount={wordCount}
+                            onMoodsChange={handleMoodsChange}
+                            onTagsChange={handleTagsChange}
+                        />
+                    </div>
+                )}
             </div>
         </div>
     )

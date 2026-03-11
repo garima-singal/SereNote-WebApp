@@ -1,35 +1,56 @@
-import { useEffect } from 'react'
+import { useEffect, useCallback } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import CharacterCount from '@tiptap/extension-character-count'
+import Underline from '@tiptap/extension-underline'
+import Highlight from '@tiptap/extension-highlight'
+import { TextStyle } from '@tiptap/extension-text-style'
+import { Color } from '@tiptap/extension-color'
+import TextAlign from '@tiptap/extension-text-align'
+import TaskList from '@tiptap/extension-task-list'
+import TaskItem from '@tiptap/extension-task-item'
+import Image from '@tiptap/extension-image'
+import Link from '@tiptap/extension-link'
 import { EditorToolbar } from './EditorToolbar'
 
 interface EditorProps {
     title: string
     body: string
+    focusMode: boolean
     onTitleChange: (title: string) => void
     onBodyChange: (html: string, text: string, wordCount: number) => void
 }
 
-export const Editor = ({ title, body, onTitleChange, onBodyChange }: EditorProps) => {
+export const Editor = ({
+    title,
+    body,
+    focusMode,
+    onTitleChange,
+    onBodyChange,
+}: EditorProps) => {
+
     const editor = useEditor({
         extensions: [
             StarterKit.configure({
                 heading: { levels: [2, 3] },
-                // Explicitly enable lists
-                bulletList: {},
-                orderedList: {},
-                listItem: {},
-                blockquote: {},
-                horizontalRule: {},
-                bold: {},
-                italic: {},
             }),
             Placeholder.configure({
                 placeholder: 'Start writing… let your thoughts flow.',
             }),
             CharacterCount,
+            Underline,
+            Highlight.configure({ multicolor: true }),
+            TextStyle,
+            Color,
+            TextAlign.configure({ types: ['heading', 'paragraph'] }),
+            TaskList,
+            TaskItem.configure({ nested: true }),
+            Image.configure({ inline: false, allowBase64: true }),
+            Link.configure({
+                openOnClick: true,
+                HTMLAttributes: { class: 'prose-link' },
+            }),
         ],
         content: body || '',
         onUpdate: ({ editor }) => {
@@ -39,7 +60,7 @@ export const Editor = ({ title, body, onTitleChange, onBodyChange }: EditorProps
             onBodyChange(html, text, words)
         },
         editorProps: {
-            attributes: { class: 'outline-none min-h-[50vh] prose-editor' },
+            attributes: { class: 'outline-none min-h-[60vh] prose-editor' },
         },
     })
 
@@ -50,8 +71,27 @@ export const Editor = ({ title, body, onTitleChange, onBodyChange }: EditorProps
         }
     }, [editor, body])
 
+    // Image upload handler
+    const handleImageUpload = useCallback(() => {
+        const input = document.createElement('input')
+        input.type = 'file'
+        input.accept = 'image/*'
+        input.onchange = async (e) => {
+            const file = (e.target as HTMLInputElement).files?.[0]
+            if (!file || !editor) return
+            const reader = new FileReader()
+            reader.onload = (ev) => {
+                const src = ev.target?.result as string
+                editor.chain().focus().setImage({ src }).run()
+            }
+            reader.readAsDataURL(file)
+        }
+        input.click()
+    }, [editor])
+
     return (
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <div className={`transition-all duration-300 ${focusMode ? 'max-w-xl' : 'max-w-2xl'
+            } mx-auto px-4 sm:px-6 py-6 sm:py-8`}>
 
             {/* Title */}
             <input
@@ -59,35 +99,37 @@ export const Editor = ({ title, body, onTitleChange, onBodyChange }: EditorProps
                 value={title}
                 onChange={e => onTitleChange(e.target.value)}
                 placeholder="Entry title…"
-                className="w-full font-lora text-xl sm:text-2xl lg:text-3xl
-                   font-semibold text-ink bg-transparent outline-none
-                   border-none placeholder:text-muted/40 mb-5 sm:mb-6
-                   leading-tight"
+                className={`w-full font-lora bg-transparent outline-none border-none
+                   placeholder:text-muted/40 mb-5 leading-tight
+                   transition-all duration-300
+                   ${focusMode
+                        ? 'text-2xl sm:text-3xl font-semibold text-ink'
+                        : 'text-xl sm:text-2xl lg:text-3xl font-semibold text-ink'
+                    }`}
             />
 
-            {/* Toolbar — horizontally scrollable on mobile */}
-            {editor && (
-                <div className="overflow-x-auto">
-                    <EditorToolbar editor={editor} />
+            {/* Toolbar — hidden in focus mode */}
+            {editor && !focusMode && (
+                <div className="overflow-x-auto mb-1">
+                    <EditorToolbar editor={editor} onImageUpload={handleImageUpload} />
                 </div>
             )}
 
-            {/* Editor */}
+            {/* Editor content */}
             <EditorContent editor={editor} />
 
             <style>{`
+        /* ── BASE ── */
         .prose-editor {
           font-family: 'Lora', serif;
           font-size: 15px;
-          line-height: 1.8;
+          line-height: 1.85;
           color: #1C1A17;
         }
         @media (max-width: 640px) {
           .prose-editor { font-size: 14px; }
         }
-        .prose-editor p {
-          margin-bottom: 0.8em;
-        }
+        .prose-editor p { margin-bottom: 0.85em; }
         .prose-editor p.is-editor-empty:first-child::before {
           content: attr(data-placeholder);
           color: #8C857C;
@@ -95,12 +137,14 @@ export const Editor = ({ title, body, onTitleChange, onBodyChange }: EditorProps
           float: left;
           height: 0;
         }
+
+        /* ── HEADINGS ── */
         .prose-editor h2 {
           font-family: 'Lora', serif;
-          font-size: 1.3rem;
+          font-size: 1.35rem;
           font-weight: 600;
           color: #1C1A17;
-          margin-top: 1.5em;
+          margin-top: 1.6em;
           margin-bottom: 0.5em;
         }
         .prose-editor h3 {
@@ -111,48 +155,132 @@ export const Editor = ({ title, body, onTitleChange, onBodyChange }: EditorProps
           margin-top: 1.2em;
           margin-bottom: 0.4em;
         }
-        .prose-editor strong {
-          font-weight: 600;
-          color: #1C1A17;
+
+        /* ── INLINE ── */
+        .prose-editor strong { font-weight: 600; color: #1C1A17; }
+        .prose-editor em { font-style: italic; }
+        .prose-editor u { text-decoration: underline; text-underline-offset: 3px; }
+        .prose-editor s { text-decoration: line-through; color: #8C857C; }
+
+        /* ── HIGHLIGHT ── */
+        .prose-editor mark {
+          border-radius: 3px;
+          padding: 0 2px;
         }
-        .prose-editor em {
-          font-style: italic;
+
+        /* ── LINK ── */
+        .prose-link {
+          color: #7A9E7E;
+          text-decoration: underline;
+          text-underline-offset: 3px;
+          cursor: pointer;
         }
-        /* ── LIST STYLES ── */
+        .prose-link:hover { color: #5A7E5E; }
+
+        /* ── LISTS ── */
         .prose-editor ul {
           list-style-type: disc;
           padding-left: 1.5em;
-          margin-bottom: 0.8em;
+          margin-bottom: 0.85em;
         }
         .prose-editor ol {
           list-style-type: decimal;
           padding-left: 1.5em;
-          margin-bottom: 0.8em;
+          margin-bottom: 0.85em;
         }
-        .prose-editor li {
-          margin-bottom: 0.25em;
-          display: list-item;
+        .prose-editor li { margin-bottom: 0.25em; display: list-item; }
+        .prose-editor li p { margin-bottom: 0; }
+
+        /* ── TASK LIST ── */
+        .prose-editor ul[data-type="taskList"] {
+          list-style: none;
+          padding-left: 0.25em;
         }
-        .prose-editor li p {
-          margin-bottom: 0;
+        .prose-editor ul[data-type="taskList"] li {
+          display: flex;
+          align-items: flex-start;
+          gap: 0.6em;
+          margin-bottom: 0.4em;
         }
+        .prose-editor ul[data-type="taskList"] li > label {
+          margin-top: 3px;
+          flex-shrink: 0;
+        }
+        .prose-editor ul[data-type="taskList"] li > label input[type="checkbox"] {
+          width: 15px;
+          height: 15px;
+          accent-color: #7A9E7E;
+          cursor: pointer;
+          border-radius: 3px;
+        }
+        .prose-editor ul[data-type="taskList"] li > div {
+          flex: 1;
+        }
+        .prose-editor ul[data-type="taskList"] li[data-checked="true"] > div {
+          text-decoration: line-through;
+          color: #8C857C;
+        }
+
         /* ── BLOCKQUOTE ── */
         .prose-editor blockquote {
           border-left: 3px solid #7A9E7E;
           padding-left: 1em;
           color: #4A4540;
           font-style: italic;
-          margin: 1em 0;
+          margin: 1.2em 0;
         }
+
         /* ── HR ── */
         .prose-editor hr {
           border: none;
           border-top: 1px solid #E5DDD3;
-          margin: 1.5em 0;
+          margin: 1.8em 0;
         }
-        .ProseMirror-focused {
-          outline: none;
+
+        /* ── IMAGE ── */
+        .prose-editor img {
+          max-width: 100%;
+          border-radius: 12px;
+          margin: 1em 0;
+          display: block;
         }
+        .prose-editor img.ProseMirror-selectednode {
+          outline: 2px solid #7A9E7E;
+          outline-offset: 2px;
+        }
+
+        /* ── CODE ── */
+        .prose-editor code {
+          background: #F5F0E8;
+          color: #C17A5A;
+          padding: 1px 5px;
+          border-radius: 4px;
+          font-size: 0.88em;
+          font-family: 'Fira Code', monospace;
+        }
+        .prose-editor pre {
+          background: #1C1A17;
+          color: #FAF7F2;
+          padding: 1em 1.2em;
+          border-radius: 12px;
+          overflow-x: auto;
+          margin: 1em 0;
+          font-size: 13px;
+          line-height: 1.6;
+        }
+
+        /* ── TEXT ALIGN ── */
+        .prose-editor [style*="text-align: center"] { text-align: center; }
+        .prose-editor [style*="text-align: right"]  { text-align: right; }
+        .prose-editor [style*="text-align: justify"] { text-align: justify; }
+
+        /* ── FOCUS MODE ── */
+        .focus-mode .prose-editor {
+          font-size: 16px;
+          line-height: 2;
+        }
+
+        .ProseMirror-focused { outline: none; }
       `}</style>
         </div>
     )
