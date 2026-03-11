@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useAuthStore } from '@/store/authStore'
 import { useEntries } from '@/hooks/useEntries'
-import { getUserProfile, updateUserSettings } from '@/services/firebase/users'
+import { getUserProfile, updateUserProfile } from '@/services/firebase/users'
 import { MOODS } from '@/types/mood'
 import { format, differenceInDays } from 'date-fns'
 
@@ -100,13 +100,19 @@ export const ProfilePage = () => {
     // ── SAVE PROFILE ─────────────────────────────────────────
     const handleSave = async () => {
         if (!user) return
-        // Save bio to Firestore via settings update
-        // (In production you'd extend the user document)
-        await updateUserSettings(user.uid, {} as any)
-        setSavedBio(bio)
-        setEditing(false)
-        setSaveMsg('Profile updated ✓')
-        setTimeout(() => setSaveMsg(''), 2000)
+        try {
+            await updateUserProfile(user.uid, {
+                displayName: displayName.trim(),
+                bio: bio.trim(),
+            })
+            setSavedBio(bio.trim())
+            setEditing(false)
+            setSaveMsg('Profile updated ✓')
+            setTimeout(() => setSaveMsg(''), 2000)
+        } catch (e: any) {
+            setSaveMsg('Failed to save. Try again.')
+            setTimeout(() => setSaveMsg(''), 2000)
+        }
     }
 
     // Days since joining
@@ -396,8 +402,8 @@ const StatCard = ({
     accent?: boolean
 }) => (
     <div className={`rounded-xl p-3 border ${accent
-        ? 'bg-accent-pale border-accent/20'
-        : 'bg-bg border-border'
+            ? 'bg-accent-pale border-accent/20'
+            : 'bg-bg border-border'
         }`}>
         <div className={`font-lora text-xl font-semibold mb-0.5 ${accent ? 'text-accent' : 'text-ink'
             }`}>

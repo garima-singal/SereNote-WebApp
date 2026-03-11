@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
+import { updateProfile } from 'firebase/auth'
+import { auth } from '@/services/firebase/config'
 import { useAuthStore } from '@/store/authStore'
-import { getUserProfile, updateUserSettings } from '@/services/firebase/users'
+import { getUserProfile, updateUserProfile, updateUserSettings } from '@/services/firebase/users'
 import { useEntries } from '@/hooks/useEntries'
 import { MOODS } from '@/types/mood'
 import { format } from 'date-fns'
@@ -33,7 +35,7 @@ const Section = ({
     </div>
 )
 
-// ── TOGGLE — fixed ─────────────────────────────────────────────
+// ── TOGGLE ─────────────────────────────────────────────────────
 const Toggle = ({
     value,
     onChange,
@@ -109,7 +111,7 @@ const OptionPills = <T extends string>({
 
 // ── MAIN PAGE ─────────────────────────────────────────────────
 export const SettingsPage = () => {
-    const { user } = useAuthStore()
+    const { user, setUser } = useAuthStore()
     const { entries } = useEntries()
 
     const [settings, setSettings] = useState<UserSettings>({
@@ -123,23 +125,55 @@ export const SettingsPage = () => {
 
     const [displayName, setDisplayName] = useState(user?.displayName ?? '')
     const [editingName, setEditingName] = useState(false)
+    const [nameError, setNameError] = useState('')
     const [saveMsg, setSaveMsg] = useState('')
     const [exporting, setExporting] = useState(false)
     const [showDelete, setShowDelete] = useState(false)
     const [deleteInput, setDeleteInput] = useState('')
 
-    // Load settings
+    // Load settings + displayName from Firestore on mount
     useEffect(() => {
         if (!user) return
         const load = async () => {
             const profile = await getUserProfile(user.uid)
             if (profile?.settings) setSettings(profile.settings)
-            setDisplayName(profile?.displayName ?? user.displayName ?? '')
+            // Prefer Firestore displayName over Auth object
+            // (they can differ if user updated name but didn't refresh Auth)
+            const name = profile?.displayName ?? user.displayName ?? ''
+            setDisplayName(name)
         }
         load()
     }, [user])
 
-    // Save a single setting
+    // ── SAVE DISPLAY NAME ─────────────────────────────────────
+    const handleSaveName = async () => {
+        if (!user || !auth.currentUser) return
+        const trimmed = displayName.trim()
+        if (!trimmed) {
+            setNameError('Name cannot be empty')
+            return
+        }
+        setNameError('')
+        try {
+            // 1. Write to Firestore user document
+            await updateUserProfile(user.uid, { displayName: trimmed })
+
+            // 2. Update Firebase Auth profile so it persists across sessions
+            await updateProfile(auth.currentUser, { displayName: trimmed })
+
+            // 3. Update Zustand store so Dashboard greeting updates immediately
+            //    without needing a page refresh or re-login
+            setUser({ ...user, displayName: trimmed })
+
+            setEditingName(false)
+            setSaveMsg('Name updated ✓')
+            setTimeout(() => setSaveMsg(''), 2000)
+        } catch {
+            setNameError('Failed to save. Please try again.')
+        }
+    }
+
+    // ── SAVE A SINGLE SETTING ─────────────────────────────────
     const handleSetting = async <K extends keyof UserSettings>(
         key: K, value: UserSettings[K]
     ) => {
@@ -151,7 +185,7 @@ export const SettingsPage = () => {
         setTimeout(() => setSaveMsg(''), 2000)
     }
 
-    // Export to PDF
+    // ── EXPORT TO PDF ─────────────────────────────────────────
     const handleExport = async () => {
         if (entries.length === 0) return
         setExporting(true)
@@ -250,40 +284,40 @@ export const SettingsPage = () => {
                 {/* ── PROFILE ── */}
                 <Section title="Profile" description="Your account information">
 
-                    {/* Display name — inline editable */}
                     <SettingRow label="Display name" description="Shown in your journal greeting">
                         {editingName ? (
-                            <div className="flex items-center gap-2">
-                                <input
-                                    type="text"
-                                    value={displayName}
-                                    onChange={e => setDisplayName(e.target.value)}
-                                    autoFocus
-                                    className="px-3 py-1.5 bg-bg border border-accent rounded-xl
-                             text-sm text-ink outline-none w-40"
-                                />
-                                <button
-                                    onClick={async () => {
-                                        setEditingName(false)
-                                        if (!user) return
-                                        await updateUserSettings(user.uid, {})
-                                        setSaveMsg('Saved ✓')
-                                        setTimeout(() => setSaveMsg(''), 2000)
-                                    }}
-                                    className="px-2.5 py-1.5 bg-accent text-white rounded-lg
-                             text-xs font-medium"
-                                >
-                                    Save
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setEditingName(false)
-                                        setDisplayName(user?.displayName ?? '')
-                                    }}
-                                    className="text-xs text-muted hover:text-ink"
-                                >
-                                    ×
-                                </button>
+                            <div className="flex flex-col gap-1.5">
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="text"
+                                        value={displayName}
+                                        onChange={e => { setDisplayName(e.target.value); setNameError('') }}
+                                        onKeyDown={e => { if (e.key === 'Enter') handleSaveName() }}
+                                        autoFocus
+                                        className="px-3 py-1.5 bg-bg border border-accent rounded-xl
+                                 text-sm text-ink outline-none w-40"
+                                    />
+                                    <button
+                                        onClick={handleSaveName}
+                                        className="px-2.5 py-1.5 bg-accent text-white rounded-lg
+                                 text-xs font-medium hover:bg-accent-dark transition-colors"
+                                    >
+                                        Save
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setEditingName(false)
+                                            setNameError('')
+                                            setDisplayName(user?.displayName ?? '')
+                                        }}
+                                        className="text-xs text-muted hover:text-ink transition-colors"
+                                    >
+                                        ×
+                                    </button>
+                                </div>
+                                {nameError && (
+                                    <span className="text-[11px] text-terra">{nameError}</span>
+                                )}
                             </div>
                         ) : (
                             <div className="flex items-center gap-2">
@@ -319,7 +353,6 @@ export const SettingsPage = () => {
 
                 {/* ── APPEARANCE ── */}
                 <Section title="Appearance" description="Personalise your writing environment">
-
                     <SettingRow label="Theme" vertical>
                         <OptionPills
                             value={settings.theme}
@@ -419,8 +452,7 @@ export const SettingsPage = () => {
                             className="flex items-center justify-center gap-2 px-5 py-2.5
                          bg-ink text-bg rounded-xl text-xs font-medium
                          hover:opacity-85 transition-opacity
-                         disabled:opacity-40 disabled:cursor-not-allowed
-                         shrink-0"
+                         disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
                         >
                             {exporting
                                 ? <><span className="animate-pulse">●</span> Preparing...</>
@@ -453,8 +485,7 @@ export const SettingsPage = () => {
                             <button
                                 onClick={() => setShowDelete(true)}
                                 className="px-4 py-2 border border-terra text-terra rounded-xl
-                           text-xs font-medium hover:bg-terra-pale transition-colors
-                           shrink-0"
+                           text-xs font-medium hover:bg-terra-pale transition-colors shrink-0"
                             >
                                 Delete account
                             </button>
@@ -482,8 +513,7 @@ export const SettingsPage = () => {
                                 <button
                                     onClick={() => { setShowDelete(false); setDeleteInput('') }}
                                     className="flex-1 py-2 border border-border text-muted
-                             rounded-xl text-xs font-medium hover:text-ink
-                             transition-colors"
+                             rounded-xl text-xs font-medium hover:text-ink transition-colors"
                                 >
                                     Cancel
                                 </button>
@@ -502,7 +532,6 @@ export const SettingsPage = () => {
 
             </div>
 
-            {/* Bottom padding for mobile */}
             <div className="h-8" />
         </div>
     )
