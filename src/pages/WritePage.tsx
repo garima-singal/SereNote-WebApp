@@ -5,6 +5,7 @@ import { createEntry, updateEntry, getEntry } from '@/services/firebase/entries'
 import { Editor } from '@/components/editor/Editor'
 import { MetaPanel } from '@/components/editor/MetaPanel'
 import type { MoodType } from '@/types/entry'
+import { useBookmark } from '@/hooks/useBookmark'
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 
@@ -23,6 +24,7 @@ export const WritePage = () => {
     const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
     const [initialized, setInitialized] = useState(false)
     const [metaOpen, setMetaOpen] = useState(false)
+    const { isBookmarked, toggle: toggleBookmark } = useBookmark(entryId)
 
     // Load existing entry
     useEffect(() => {
@@ -166,6 +168,16 @@ export const WritePage = () => {
                             }`}
                     >
                         {metaOpen ? '← Hide' : '✦ Details'}
+                    </button>
+                    <button
+                        onClick={toggleBookmark}
+                        title={isBookmarked ? 'Remove bookmark' : 'Bookmark this entry'}
+                        className={`p-2 rounded-xl border transition-colors ${isBookmarked
+                            ? 'bg-gold/10 text-gold border-gold/30'
+                            : 'border-border text-muted hover:text-ink'
+                            }`}
+                    >
+                        {isBookmarked ? '◈' : '◇'}
                     </button>
                 </div>
             </div>

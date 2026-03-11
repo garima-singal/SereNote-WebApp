@@ -7,6 +7,7 @@ import { useAuthStore } from '@/store/authStore'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { TimelinePage } from '@/pages/TimelinePage'
 import { ProfilePage } from '@/pages/ProfilePage'
+import { BookmarksPage } from '@/pages/BookmarksPage'
 
 // ── PROTECTED ROUTE ──────────────────────────────────────────
 // Guards private pages — redirects to /auth if not logged in
@@ -61,11 +62,7 @@ export const router = createBrowserRouter([
             {
                 // Bookmarks page — coming soon
                 path: 'bookmarks',
-                element: (
-                    <div className="p-8 text-ink font-lora text-xl">
-                        Bookmarks — coming soon
-                    </div>
-                ),
+                element: <BookmarksPage />
             },
 
             {
