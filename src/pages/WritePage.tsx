@@ -348,6 +348,8 @@ export const WritePage = () => {
                     <div className="w-[240px] shrink-0 border-l border-border
                           overflow-y-auto bg-card hidden sm:block">
                         <MetaPanel
+                            entryId={docId}
+                            aiOptIn={aiOptIn}
                             moods={moods}
                             tags={tags}
                             wordCount={wordCount}
@@ -371,6 +373,8 @@ export const WritePage = () => {
                             <div className="w-8 h-1 bg-border rounded-full" />
                         </div>
                         <MetaPanel
+                            entryId={docId}
+                            aiOptIn={aiOptIn}
                             moods={moods}
                             tags={tags}
                             wordCount={wordCount}

@@ -1,11 +1,14 @@
 import { useState, useRef } from 'react'
 import { MOODS } from '@/types/mood'
+import { auth } from '@/services/firebase/config'
 import type { MoodType } from '@/types/entry'
 
 interface MetaPanelProps {
     moods: MoodType[]
     tags: string[]
     wordCount: number
+    entryId: string | null
+    aiOptIn: boolean
     onMoodsChange: (m: MoodType[]) => void
     onTagsChange: (t: string[]) => void
 }
@@ -14,13 +17,18 @@ export const MetaPanel = ({
     moods,
     tags,
     wordCount,
+    entryId,
+    aiOptIn,
     onMoodsChange,
     onTagsChange,
 }: MetaPanelProps) => {
     const [tagInput, setTagInput] = useState('')
+    const [moodLoading, setMoodLoading] = useState(false)
+    const [moodReasoning, setMoodReasoning] = useState('')
+    const [moodError, setMoodError] = useState('')
     const inputRef = useRef<HTMLInputElement>(null)
 
-    const readingTime = wordCount === 0 ? null : Math.max(1, Math.ceil(wordCount / 50))
+    const readingTime = wordCount === 0 ? null : Math.max(1, Math.ceil(wordCount / 200))
 
     // Toggle a mood on/off
     const toggleMood = (m: MoodType) => {
@@ -28,6 +36,42 @@ export const MetaPanel = ({
             onMoodsChange(moods.filter(x => x !== m))
         } else {
             onMoodsChange([...moods, m])
+        }
+    }
+
+    // ── AI MOOD SUGGESTION ──────────────────────────────────
+    const suggestMoods = async () => {
+        if (!entryId || wordCount < 5) return
+        setMoodLoading(true)
+        setMoodError('')
+        setMoodReasoning('')
+
+        try {
+            const token = await auth.currentUser?.getIdToken()
+            if (!token) throw new Error('Not authenticated')
+
+            const res = await fetch('/api/ai/mood', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify({ entryId }),
+            })
+
+            const data = await res.json()
+            if (!res.ok) throw new Error(data.error ?? 'Failed to predict moods')
+
+            // Merge suggested moods with existing (don't overwrite manual selections)
+            const suggested = data.moods as MoodType[]
+            const merged = Array.from(new Set([...moods, ...suggested])) as MoodType[]
+            onMoodsChange(merged)
+            setMoodReasoning(data.reasoning ?? '')
+
+        } catch (e: any) {
+            setMoodError(e.message)
+        } finally {
+            setMoodLoading(false)
         }
     }
 
@@ -70,15 +114,53 @@ export const MetaPanel = ({
 
             {/* ── MOOD ── */}
             <div>
-                <div className="text-[10px] font-semibold text-muted uppercase
-                        tracking-wider mb-2">
-                    Mood
-                    {moods.length > 0 && (
-                        <span className="ml-1.5 text-accent normal-case font-normal">
-                            ({moods.length} selected)
-                        </span>
+                <div className="flex items-center justify-between mb-2">
+                    <div className="text-[10px] font-semibold text-muted uppercase tracking-wider">
+                        Mood
+                        {moods.length > 0 && (
+                            <span className="ml-1.5 text-accent normal-case font-normal">
+                                ({moods.length} selected)
+                            </span>
+                        )}
+                    </div>
+
+                    {/* AI suggest button — only when aiOptIn + entry saved + has content */}
+                    {aiOptIn && entryId && wordCount >= 5 && (
+                        <button
+                            onClick={suggestMoods}
+                            disabled={moodLoading}
+                            className="flex items-center gap-1 text-[10px] text-lav
+                         hover:text-lav/80 transition-colors disabled:opacity-50"
+                        >
+                            {moodLoading ? (
+                                <>
+                                    <span className="w-2.5 h-2.5 border border-lav border-t-transparent
+                                   rounded-full animate-spin inline-block" />
+                                    Predicting…
+                                </>
+                            ) : (
+                                <>✦ Suggest</>
+                            )}
+                        </button>
                     )}
                 </div>
+
+                {/* Reasoning tooltip */}
+                {moodReasoning && !moodLoading && (
+                    <div className="mb-2 px-2.5 py-1.5 bg-lav-pale rounded-lg
+                          border border-lav/20 text-[10px] text-ink2 italic">
+                        {moodReasoning}
+                    </div>
+                )}
+
+                {/* Error */}
+                {moodError && (
+                    <div className="mb-2 px-2.5 py-1.5 bg-terra-pale rounded-lg
+                          border border-terra/20 text-[10px] text-terra">
+                        {moodError}
+                    </div>
+                )}
+
                 <div className="flex flex-wrap gap-1.5">
                     {MOODS.map(m => {
                         const active = moods.includes(m.value)
@@ -105,7 +187,6 @@ export const MetaPanel = ({
                 <div className="text-[10px] font-semibold text-muted uppercase
                         tracking-wider mb-2">Tags</div>
 
-                {/* Tag chips + input */}
                 <div
                     onClick={() => inputRef.current?.focus()}
                     className="min-h-[38px] flex flex-wrap gap-1.5 p-2
