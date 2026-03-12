@@ -111,7 +111,10 @@ export const WritePage = () => {
                 setDocId(newId)
                 window.history.replaceState(null, '', `/write/${newId}`)
             }
+            const savedId = id ?? docId
             setSaveStatus('saved')
+            // Embed for RAG — fire and forget
+            if (savedId) embedEntry(savedId)
             if (isManual) {
                 toast.success('Entry saved!')
                 setTimeout(() => navigate('/timeline'), 500)
