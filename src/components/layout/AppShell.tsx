@@ -3,11 +3,13 @@ import { Outlet, useLocation, Link } from 'react-router-dom'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { Toaster } from 'sonner'
 import { useAuthStore } from '@/store/authStore'
+import { useTheme } from '@/hooks/useTheme'
 
 export const AppShell = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false)
     const location = useLocation()
     const { user } = useAuthStore()
+    useTheme() // applies data-theme to <html> based on user's saved preference
 
     // Close mobile drawer on route change
     useEffect(() => {

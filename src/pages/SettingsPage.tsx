@@ -6,6 +6,7 @@ import { getUserProfile, updateUserProfile, updateUserSettings } from '@/service
 import { useEntries } from '@/hooks/useEntries'
 import { MOODS } from '@/types/mood'
 import { format } from 'date-fns'
+import { applyTheme } from '@/hooks/useTheme'
 import type { UserSettings } from '@/types/user'
 
 // ── SECTION WRAPPER ───────────────────────────────────────────
@@ -179,6 +180,8 @@ export const SettingsPage = () => {
     ) => {
         const updated = { ...settings, [key]: value }
         setSettings(updated)
+        // Apply theme instantly to DOM — no reload needed
+        if (key === 'theme') applyTheme(value as any)
         if (!user) return
         await updateUserSettings(user.uid, { [key]: value })
         setSaveMsg('Saved ✓')

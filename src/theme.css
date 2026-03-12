@@ -1,0 +1,119 @@
+/* ── LIGHT (default) ─────────────────────────────────────────────────────────
+   Already defined in @theme block in index.css — no overrides needed         */
+
+/* ── SEPIA ───────────────────────────────────────────────────────────────────*/
+[data-theme="sepia"] {
+    --color-bg: #F5EDD9;
+    --color-surface: #EDE0C4;
+    --color-card: #FAF3E0;
+    --color-ink: #2C1810;
+    --color-ink2: #5C3D2E;
+    --color-muted: #9E7B5A;
+    --color-border: #D4B896;
+    --color-accent: #7A6E3E;
+    --color-accent-pale: #EDE8D0;
+    --color-accent-dark: #5A4F2A;
+    --color-terra: #B85C38;
+    --color-terra-pale: #F2DDD4;
+    --color-gold: #C49A2A;
+    --color-lav: #8B7BA8;
+    --color-lav-pale: #E8E0F0;
+}
+
+/* ── DARK ────────────────────────────────────────────────────────────────────*/
+[data-theme="dark"] {
+    --color-bg: #141210;
+    --color-surface: #1E1B18;
+    --color-card: #252220;
+    --color-ink: #F0EBE3;
+    --color-ink2: #C4BDB5;
+    --color-muted: #7A736A;
+    --color-border: #353028;
+    --color-accent: #8FB893;
+    --color-accent-pale: #1E2E20;
+    --color-accent-dark: #6A9870;
+    --color-terra: #D4886A;
+    --color-terra-pale: #2E1E18;
+    --color-gold: #D4A853;
+    --color-lav: #A898CC;
+    --color-lav-pale: #1E1A2E;
+}
+
+/* ── DARK — editor overrides ─────────────────────────────────────────────────*/
+[data-theme="dark"] .prose-editor {
+    color: #F0EBE3;
+}
+
+[data-theme="dark"] .prose-editor h2,
+[data-theme="dark"] .prose-editor h3 {
+    color: #F0EBE3;
+}
+
+[data-theme="dark"] .prose-editor strong {
+    color: #F0EBE3;
+}
+
+[data-theme="dark"] .prose-editor blockquote {
+    color: #C4BDB5;
+    border-left-color: #8FB893;
+}
+
+[data-theme="dark"] .prose-editor code {
+    background: #2A2520;
+    color: #D4886A;
+}
+
+[data-theme="dark"] .prose-editor pre {
+    background: #0E0C0A;
+}
+
+[data-theme="dark"] .prose-editor hr {
+    border-top-color: #353028;
+}
+
+/* ── SEPIA — editor overrides ────────────────────────────────────────────────*/
+[data-theme="sepia"] .prose-editor {
+    color: #2C1810;
+}
+
+[data-theme="sepia"] .prose-editor blockquote {
+    border-left-color: #7A6E3E;
+    color: #5C3D2E;
+}
+
+[data-theme="sepia"] .prose-editor code {
+    background: #EDE0C4;
+    color: #B85C38;
+}
+
+/* ── TRANSITIONS — smooth theme switching ────────────────────────────────────*/
+*,
+*::before,
+*::after {
+    transition-property: background-color, border-color, color;
+    transition-duration: 200ms;
+    transition-timing-function: ease;
+}
+
+/* Exclude transitions on elements where it would feel wrong */
+input,
+textarea,
+button,
+a,
+[class*="animate"] {
+    transition-property: none;
+}
+
+/* Re-apply only intentional transitions on interactive elements */
+button {
+    transition: opacity 150ms ease, background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+
+a {
+    transition: color 150ms ease;
+}
+
+input,
+textarea {
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+}
