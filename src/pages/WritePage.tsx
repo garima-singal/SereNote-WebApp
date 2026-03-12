@@ -3,9 +3,11 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useAuthStore } from '@/store/authStore'
 import { createEntry, updateEntry, getEntry } from '@/services/firebase/entries'
+import { getUserProfile } from '@/services/firebase/users'
 import { useBookmark } from '@/hooks/useBookmark'
 import { Editor } from '@/components/editor/Editor'
 import { MetaPanel } from '@/components/editor/MetaPanel'
+import { AIReflectionPanel } from '@/components/editor/AIReflectionPanel'
 import type { MoodType } from '@/types/entry'
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
@@ -38,10 +40,21 @@ export const WritePage = () => {
     const [showGoalPick, setShowGoalPick] = useState(false)
     const [initialized, setInitialized] = useState(false)
 
+    // AI state
+    const [aiOptIn, setAiOptIn] = useState(false)
+
     const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
     // Bookmark
     const { isBookmarked, toggle: toggleBookmark } = useBookmark(docId ?? '')
+
+    // ── LOAD AI OPT-IN FROM USER SETTINGS ────────────────────
+    useEffect(() => {
+        if (!user) return
+        getUserProfile(user.uid).then(profile => {
+            setAiOptIn(profile?.settings?.aiOptIn ?? false)
+        })
+    }, [user])
 
     // ── LOAD EXISTING ENTRY ───────────────────────────────────
     useEffect(() => {
@@ -254,7 +267,6 @@ export const WritePage = () => {
                             </button>
                         )}
 
-                        {/* Meta panel toggle */}
                         {/* Save button */}
                         <button
                             onClick={() => save(title, body, bodyText, moods, tags, wordCount, docId, true)}
@@ -331,7 +343,7 @@ export const WritePage = () => {
                     />
                 </div>
 
-                {/* Meta panel — hidden in focus mode */}
+                {/* Meta panel — desktop, hidden in focus mode */}
                 {metaOpen && !focusMode && (
                     <div className="w-[240px] shrink-0 border-l border-border
                           overflow-y-auto bg-card hidden sm:block">
@@ -341,6 +353,11 @@ export const WritePage = () => {
                             wordCount={wordCount}
                             onMoodsChange={handleMoodsChange}
                             onTagsChange={handleTagsChange}
+                        />
+                        <AIReflectionPanel
+                            entryId={docId}
+                            wordCount={wordCount}
+                            aiOptIn={aiOptIn}
                         />
                     </div>
                 )}
@@ -359,6 +376,11 @@ export const WritePage = () => {
                             wordCount={wordCount}
                             onMoodsChange={handleMoodsChange}
                             onTagsChange={handleTagsChange}
+                        />
+                        <AIReflectionPanel
+                            entryId={docId}
+                            wordCount={wordCount}
+                            aiOptIn={aiOptIn}
                         />
                     </div>
                 )}
