@@ -1,24 +1,3 @@
-# api/ai/reflect.py
-# ─────────────────────────────────────────────────────────────
-# POST /api/ai/reflect
-# Generates a short AI reflection for a journal entry.
-#
-# Request body:
-#   { "entryId": "abc123" }
-#
-# Response:
-#   { "reflection": "..." }
-#
-# Flow:
-#   1. Verify Firebase token
-#   2. Check rate limit (20/day)
-#   3. Check user has AI opted in
-#   4. Fetch entry from Firestore
-#   5. Call GPT-4o
-#   6. Save reflection back to entry
-#   7. Return reflection text
-# ─────────────────────────────────────────────────────────────
-
 import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))

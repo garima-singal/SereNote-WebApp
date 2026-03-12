@@ -1,17 +1,3 @@
-# api/lib/vector_store.py
-# ─────────────────────────────────────────────────────────────
-# RAG vector store using Upstash Vector + OpenAI embeddings.
-#
-# Each entry is stored as a vector with:
-#   - id:       "{uid}_{entryId}"
-#   - vector:   1536-dim float from text-embedding-3-small
-#   - metadata: { uid, entryId, title, date, moods, snippet }
-#
-# Env vars required:
-#   UPSTASH_VECTOR_REST_URL
-#   UPSTASH_VECTOR_REST_TOKEN
-# ─────────────────────────────────────────────────────────────
-
 import os
 import json
 import httpx

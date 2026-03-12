@@ -1,10 +1,3 @@
-# api/lib/rate_limit.py
-# ─────────────────────────────────────────────────────────────
-# Rate limiting using Upstash Redis.
-# Sliding window — tracks requests per user per day.
-# Each AI feature has its own daily limit.
-# ─────────────────────────────────────────────────────────────
-
 import os
 import time
 from upstash_redis import Redis

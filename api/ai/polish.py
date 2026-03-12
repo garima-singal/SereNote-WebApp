@@ -1,24 +1,3 @@
-# api/ai/polish.py
-# ─────────────────────────────────────────────────────────────
-# POST /api/ai/polish
-# Improves grammar and clarity of a journal entry.
-#
-# Request body:
-#   { "entryId": "abc123" }
-#
-# Response:
-#   { "polishedHtml": "<p>...</p>", "changes": "summary of changes" }
-#
-# Flow:
-#   1. Verify Firebase token
-#   2. Check rate limit (10/day)
-#   3. Check AI opt-in
-#   4. Fetch entry HTML from Firestore
-#   5. Call GPT-4o-mini — fix grammar, keep voice
-#   6. Save polished HTML back to Firestore
-#   7. Return polished HTML to frontend
-# ─────────────────────────────────────────────────────────────
-
 import sys
 import os
 import json

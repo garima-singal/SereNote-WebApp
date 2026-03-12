@@ -1,22 +1,3 @@
-# api/ai/chat.py
-# ─────────────────────────────────────────────────────────────
-# POST /api/ai/chat
-# Multi-turn conversation with RAG — retrieves only the most
-# relevant entries for each user message using Upstash Vector.
-#
-# Request body:
-#   {
-#     "messages": [
-#       { "role": "user",      "content": "What stressed me lately?" },
-#       { "role": "assistant", "content": "Based on your entries..." },
-#       { "role": "user",      "content": "What about last week?" }
-#     ]
-#   }
-#
-# Response:
-#   { "reply": "...", "entriesUsed": 5 }
-# ─────────────────────────────────────────────────────────────
-
 import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))

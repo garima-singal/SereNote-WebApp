@@ -1,16 +1,3 @@
-# api/ai/embed.py
-# ─────────────────────────────────────────────────────────────
-# POST /api/ai/embed
-# Generates and stores an embedding for a journal entry.
-# Called automatically from the frontend after every save.
-#
-# Request body:
-#   { "entryId": "abc123" }
-#
-# Response:
-#   { "success": true }
-# ─────────────────────────────────────────────────────────────
-
 import sys
 import os
 from datetime import datetime, timezone
