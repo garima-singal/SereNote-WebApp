@@ -1,6 +1,8 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuthStore } from '@/store/authStore'
 import { useEntries } from '@/hooks/useEntries'
+import { getUserProfile } from '@/services/firebase/users'
+import { auth } from '@/services/firebase/config'
 import { MOODS } from '@/types/mood'
 import { useNavigate } from 'react-router-dom'
 import { format, subYears, isWithinInterval, startOfDay, endOfDay } from 'date-fns'
@@ -38,6 +40,46 @@ export const DashboardPage = () => {
         refetch()
     }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+    const [aiOptIn, setAiOptIn] = useState(false)
+    const [aiPrompt, setAiPrompt] = useState('')
+    const [aiPromptTheme, setAiPromptTheme] = useState('')
+    const [aiPromptLoading, setAiPromptLoading] = useState(false)
+    const [aiPromptFetched, setAiPromptFetched] = useState(false)
+
+    // Load aiOptIn from user settings
+    useEffect(() => {
+        if (!user) return
+        getUserProfile(user.uid).then(profile => {
+            setAiOptIn(profile?.settings?.aiOptIn ?? false)
+        })
+    }, [user])
+
+    // Fetch personalized prompt once when aiOptIn is confirmed + entries loaded
+    useEffect(() => {
+        if (!aiOptIn || loading || aiPromptFetched || entries.length === 0) return
+        const fetchPrompt = async () => {
+            setAiPromptLoading(true)
+            try {
+                const token = await auth.currentUser?.getIdToken()
+                if (!token) return
+                const res = await fetch('/api/ai/prompt', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
+                const data = await res.json()
+                if (res.ok && data.prompt) {
+                    setAiPrompt(data.prompt)
+                    setAiPromptTheme(data.theme ?? '')
+                    setAiPromptFetched(true)
+                }
+            } catch {
+                // silently fall back to static prompt
+            } finally {
+                setAiPromptLoading(false)
+            }
+        }
+        fetchPrompt()
+    }, [aiOptIn, loading, entries, aiPromptFetched])
+
     const firstName = user?.displayName?.split(' ')[0] ?? 'there'
     const hour = new Date().getHours()
     const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
@@ -54,7 +96,8 @@ export const DashboardPage = () => {
         'What are you looking forward to?',
         'What did you learn today?',
     ]
-    const prompt = prompts[new Date().getDay()]
+    const staticPrompt = prompts[new Date().getDay()]
+    const prompt = aiPrompt || staticPrompt
 
     const totalWords = entries.reduce((a, e) => a + e.wordCount, 0)
     const thisMonthCount = entries.filter(
