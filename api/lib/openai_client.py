@@ -1,4 +1,5 @@
 import os
+import httpx
 from openai import OpenAI
 
 _client = None
@@ -9,7 +10,10 @@ def get_client() -> OpenAI:
         return _client
     _client = OpenAI(
         api_key=os.environ["OPENAI_API_KEY"],
-        http_client=None,  
+        http_client=httpx.Client(
+            timeout=30.0,
+            follow_redirects=True,
+        )
     )
     return _client
 

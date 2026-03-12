@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Outlet, useLocation, Link } from 'react-router-dom'
 import { Sidebar } from '@/components/layout/Sidebar'
-import { Toaster } from 'sonner'
 import { useAuthStore } from '@/store/authStore'
 import { useTheme } from '@/hooks/useTheme'
 
@@ -29,17 +28,6 @@ export const AppShell = () => {
     return (
         <div className="flex h-screen overflow-hidden bg-bg">
 
-            {/* ── TOAST NOTIFICATIONS ─────────────────────────────── */}
-            <Toaster
-                position="top-right"
-                richColors
-                toastOptions={{
-                    style: {
-                        fontFamily: 'DM Sans, sans-serif',
-                        fontSize: '13px',
-                    }
-                }}
-            />
 
             {/* ── DESKTOP SIDEBAR ─────────────────────────────────── */}
             <div className="hidden lg:flex shrink-0">
