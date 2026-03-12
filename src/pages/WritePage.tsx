@@ -44,9 +44,10 @@ export const WritePage = () => {
     // AI state
     const [aiOptIn, setAiOptIn] = useState(false)
     const [polishing, setPolishing] = useState(false)
-    const [polishChanges, setPolishChanges] = useState('')
+    const [, setPolishChanges] = useState('')
 
     const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const editorRef = useRef<{ setContent: (html: string) => void } | null>(null)
 
     // Bookmark
     const { isBookmarked, toggle: toggleBookmark } = useBookmark(docId ?? '')
@@ -153,8 +154,10 @@ export const WritePage = () => {
             })
             const data = await res.json()
             if (!res.ok) throw new Error(data.error ?? 'Polish failed')
-            // Update editor content with polished HTML
+            // Update editor content directly via ref (avoids re-render/focus loss)
             setBody(data.polishedHtml)
+            setBodyText(data.bodyText ?? bodyText)
+            editorRef.current?.setContent(data.polishedHtml)
             setPolishChanges(data.changes ?? '')
             toast.success('✦ Entry polished!')
         } catch (e: any) {
@@ -393,10 +396,10 @@ export const WritePage = () => {
                     <Editor
                         title={title}
                         body={body}
-                        polishedBody={polishChanges ? body : undefined}
                         focusMode={focusMode}
                         onTitleChange={handleTitleChange}
                         onBodyChange={handleBodyChange}
+                        onReady={(api) => { editorRef.current = api }}
                     />
                 </div>
 

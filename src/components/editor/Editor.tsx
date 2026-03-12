@@ -17,7 +17,7 @@ import { EditorToolbar } from './EditorToolbar'
 interface EditorProps {
     title: string
     body: string
-    polishedBody?: string
+    onReady?: (api: { setContent: (html: string) => void }) => void
     focusMode: boolean
     onTitleChange: (title: string) => void
     onBodyChange: (html: string, text: string, wordCount: number) => void
@@ -26,7 +26,7 @@ interface EditorProps {
 export const Editor = ({
     title,
     body,
-    polishedBody,
+    onReady,
     focusMode,
     onTitleChange,
     onBodyChange,
@@ -85,12 +85,19 @@ export const Editor = ({
         }
     }, [editor, body])
 
-    // Force-replace content when polish returns new HTML
+    // Expose editor API to parent via onReady callback
+    // This lets WritePage call setContent for polish without causing re-renders
     useEffect(() => {
-        if (editor && polishedBody) {
-            editor.commands.setContent(polishedBody)
+        if (editor && onReady) {
+            onReady({
+                setContent: (html: string) => {
+                    editor.commands.setContent(html)
+                }
+            })
         }
-    }, [editor, polishedBody])
+    }, [editor, onReady])
+
+
 
     // Image upload handler
     const handleImageUpload = useCallback(() => {
