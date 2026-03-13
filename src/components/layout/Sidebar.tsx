@@ -1,23 +1,35 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
 import { logOut } from '@/services/firebase/auth'
+import {
+    LayoutDashboard,
+    ScrollText,
+    Bookmark,
+    BarChart2,
+    Search,
+    MessageCircle,
+    User,
+    Settings,
+    PenLine,
+    X,
+} from 'lucide-react'
 
 interface SidebarProps {
     onClose?: () => void
 }
 
 const NAV = [
-    { to: '/', label: 'Dashboard', icon: '⌂', end: true },
-    { to: '/timeline', label: 'Timeline', icon: '◷', end: false },
-    { to: '/bookmarks', label: 'Bookmarks', icon: '◈', end: false },
-    { to: '/insights', label: 'Insights', icon: '◎', end: false },
-    { to: '/search', label: 'Search', icon: '⌕', end: false },
-    { to: '/chat', label: 'Chat', icon: '✦', end: false },
+    { to: '/', label: 'Dashboard', Icon: LayoutDashboard, end: true },
+    { to: '/timeline', label: 'Timeline', Icon: ScrollText, end: false },
+    { to: '/bookmarks', label: 'Bookmarks', Icon: Bookmark, end: false },
+    { to: '/insights', label: 'Insights', Icon: BarChart2, end: false },
+    { to: '/search', label: 'Search', Icon: Search, end: false },
+    { to: '/chat', label: 'Chat', Icon: MessageCircle, end: false },
 ]
 
 const BOTTOM_NAV = [
-    { to: '/profile', label: 'Profile', icon: '○', end: false },
-    { to: '/settings', label: 'Settings', icon: '◇', end: false },
+    { to: '/profile', label: 'Profile', Icon: User, end: false },
+    { to: '/settings', label: 'Settings', Icon: Settings, end: false },
 ]
 
 export const Sidebar = ({ onClose }: SidebarProps) => {
@@ -44,20 +56,19 @@ export const Sidebar = ({ onClose }: SidebarProps) => {
             <div className="px-5 py-5 border-b border-border flex items-center justify-between">
                 <div>
                     <div className="font-lora text-lg font-semibold text-ink tracking-tight">
-                        SereNote
+                        Sere<span className="text-accent">Note</span>
                     </div>
                     <div className="text-[10px] text-muted">Your private journal</div>
                 </div>
-                {/* Close button — mobile only */}
                 {onClose && (
                     <button
                         onClick={onClose}
                         className="lg:hidden text-muted hover:text-ink transition-colors
                        w-7 h-7 flex items-center justify-center rounded-lg
-                       hover:bg-surface text-lg leading-none"
+                       hover:bg-surface"
                         aria-label="Close sidebar"
                     >
-                        ×
+                        <X size={16} />
                     </button>
                 )}
             </div>
@@ -70,14 +81,14 @@ export const Sidebar = ({ onClose }: SidebarProps) => {
                      font-medium hover:bg-accent-dark transition-colors
                      flex items-center justify-center gap-2 shadow-sm"
                 >
-                    <span className="text-base leading-none">+</span>
+                    <PenLine size={14} />
                     New Entry
                 </button>
             </div>
 
             {/* ── MAIN NAV ── */}
             <nav className="flex-1 px-3 py-2 flex flex-col gap-0.5 overflow-y-auto">
-                {NAV.map(({ to, label, icon, end }) => (
+                {NAV.map(({ to, label, Icon, end }) => (
                     <NavLink
                         key={to}
                         to={to}
@@ -87,10 +98,10 @@ export const Sidebar = ({ onClose }: SidebarProps) => {
                     >
                         {({ isActive }) => (
                             <>
-                                <span className={`text-base w-5 text-center leading-none shrink-0
-                  ${isActive ? 'text-white' : 'text-muted group-hover:text-ink'}`}>
-                                    {icon}
-                                </span>
+                                <Icon
+                                    size={16}
+                                    className={`shrink-0 ${isActive ? 'text-white' : 'text-muted group-hover:text-ink'}`}
+                                />
                                 {label}
                             </>
                         )}
@@ -100,7 +111,7 @@ export const Sidebar = ({ onClose }: SidebarProps) => {
                 {/* Divider */}
                 <div className="my-2 border-t border-border" />
 
-                {BOTTOM_NAV.map(({ to, label, icon, end }) => (
+                {BOTTOM_NAV.map(({ to, label, Icon, end }) => (
                     <NavLink
                         key={to}
                         to={to}
@@ -110,10 +121,10 @@ export const Sidebar = ({ onClose }: SidebarProps) => {
                     >
                         {({ isActive }) => (
                             <>
-                                <span className={`text-base w-5 text-center leading-none shrink-0
-                  ${isActive ? 'text-white' : 'text-muted group-hover:text-ink'}`}>
-                                    {icon}
-                                </span>
+                                <Icon
+                                    size={16}
+                                    className={`shrink-0 ${isActive ? 'text-white' : 'text-muted group-hover:text-ink'}`}
+                                />
                                 {label}
                             </>
                         )}
