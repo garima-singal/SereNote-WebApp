@@ -3,6 +3,10 @@ import { createRoot } from 'react-dom/client'
 import { RouterProvider } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { router } from './router'
+import { initNotifications } from './services/notifications'
+
+// Init notifications on app load (restores scheduled reminders)
+initNotifications()
 import { useAuth } from './hooks/useAuth'
 import './index.css'
 

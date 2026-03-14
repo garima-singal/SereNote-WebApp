@@ -7,6 +7,14 @@ import { useEntries } from '@/hooks/useEntries'
 import { MOODS } from '@/types/mood'
 import { format } from 'date-fns'
 import { applyTheme } from '@/hooks/useTheme'
+import {
+    isNotificationSupported,
+    requestPermission,
+    registerServiceWorker,
+    scheduleReminder,
+    cancelReminder,
+    saveReminderConfig,
+} from '@/services/notifications'
 import type { UserSettings } from '@/types/user'
 
 // ── SECTION WRAPPER ───────────────────────────────────────────
@@ -128,6 +136,9 @@ export const SettingsPage = () => {
     const [editingName, setEditingName] = useState(false)
     const [nameError, setNameError] = useState('')
     const [saveMsg, setSaveMsg] = useState('')
+    const [notifPermission, setNotifPermission] = useState<NotificationPermission | 'unsupported'>(
+        typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'
+    )
     const [exporting, setExporting] = useState(false)
     const [showDelete, setShowDelete] = useState(false)
     const [deleteInput, setDeleteInput] = useState('')
@@ -182,6 +193,35 @@ export const SettingsPage = () => {
         setSettings(updated)
         // Apply theme instantly to DOM — no reload needed
         if (key === 'theme') applyTheme(value as any)
+
+        // Handle notification enable/disable
+        if (key === 'notificationsEnabled') {
+            if (value) {
+                const permission = await requestPermission()
+                setNotifPermission(permission)
+                if (permission === 'granted') {
+                    await registerServiceWorker()
+                    const time = settings.reminderTime ?? '21:00'
+                    scheduleReminder(time)
+                    saveReminderConfig({ enabled: true, time })
+                } else {
+                    // Permission denied — revert toggle
+                    const reverted = { ...updated, notificationsEnabled: false }
+                    setSettings(reverted)
+                    await updateUserSettings(user!.uid, { notificationsEnabled: false })
+                    return
+                }
+            } else {
+                cancelReminder()
+                saveReminderConfig({ enabled: false, time: settings.reminderTime ?? '21:00' })
+            }
+        }
+
+        // Handle reminder time change
+        if (key === 'reminderTime' && settings.notificationsEnabled) {
+            scheduleReminder(value as string)
+            saveReminderConfig({ enabled: true, time: value as string })
+        }
         if (!user) return
         await updateUserSettings(user.uid, { [key]: value })
         setSaveMsg('Saved ✓')
@@ -404,7 +444,20 @@ export const SettingsPage = () => {
                         />
                     </SettingRow>
 
-                    {settings.notificationsEnabled && (
+                    {notifPermission === 'denied' && (
+                        <div className="mt-2 px-3 py-2 bg-terra-pale rounded-lg
+                                        border border-terra/20 text-xs text-terra">
+                            Notifications are blocked in your browser.
+                            Please enable them in browser settings to use reminders.
+                        </div>
+                    )}
+                    {!isNotificationSupported() && (
+                        <div className="mt-2 px-3 py-2 bg-surface rounded-lg
+                                        border border-border text-xs text-muted">
+                            Push notifications are not supported in this browser.
+                        </div>
+                    )}
+                    {settings.notificationsEnabled && notifPermission === 'granted' && (
                         <SettingRow label="Reminder time" description="When to send the reminder">
                             <input
                                 type="time"
