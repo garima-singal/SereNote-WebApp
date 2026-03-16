@@ -1,9 +1,9 @@
 export interface UserSettings {
     theme: 'light' | 'dark' | 'sepia'
     fontSize: 'sm' | 'md' | 'lg'
-    fontFamily: 'lora' | 'crimson' | 'dm-sans'
+    fontFamily: 'lora' | 'dm-sans'
     notificationsEnabled: boolean
-    reminderTime: string   // "21:00"
+    reminderTime: string
     aiOptIn: boolean
 }
 
@@ -12,9 +12,11 @@ export interface UserProfile {
     displayName: string
     email: string
     photoURL: string
-    createdAt: Date
+    bio: string
+    createdAt?: any
     streak: number
     bestStreak: number
     totalEntries: number
+    onboardingComplete: boolean
     settings: UserSettings
 }

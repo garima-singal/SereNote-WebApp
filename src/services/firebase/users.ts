@@ -25,6 +25,7 @@ export const createUserDocument = async (user: User): Promise<void> => {
         streak: 0,
         bestStreak: 0,
         totalEntries: 0,
+        onboardingComplete: false,
         settings: {
             theme: 'light',
             fontSize: 'md',
@@ -33,6 +34,28 @@ export const createUserDocument = async (user: User): Promise<void> => {
             reminderTime: '21:00',
             aiOptIn: false,
         },
+    })
+}
+
+// ── COMPLETE ONBOARDING ───────────────────────────────────────────────────────
+export const completeOnboarding = async (
+    uid: string,
+    data: {
+        displayName: string
+        theme: string
+        aiOptIn: boolean
+        reminderTime: string
+        notificationsEnabled: boolean
+    }
+): Promise<void> => {
+    const userRef = doc(db, 'users', uid)
+    await updateDoc(userRef, {
+        displayName: data.displayName,
+        onboardingComplete: true,
+        'settings.theme': data.theme,
+        'settings.aiOptIn': data.aiOptIn,
+        'settings.reminderTime': data.reminderTime,
+        'settings.notificationsEnabled': data.notificationsEnabled,
     })
 }
 
