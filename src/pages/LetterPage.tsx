@@ -29,6 +29,10 @@ export const LetterPage = () => {
     const [deliverIn, setDeliverIn] = useState(6)
     const [userNote, setUserNote] = useState('')
     const [openedLetter, setOpenedLetter] = useState<Letter | null>(null)
+    const [mode, setMode] = useState<'ai' | 'manual'>('ai')
+    const [manualText, setManualText] = useState('')
+    const [customDate, setCustomDate] = useState('')
+    const [saving, setSaving] = useState(false)
 
     // Load letters from Firestore via API
     useEffect(() => {
@@ -113,6 +117,55 @@ export const LetterPage = () => {
 
     const isReady = (letter: Letter) => isPast(parseISO(letter.deliverAt))
 
+    const minDate = () => {
+        const d = new Date()
+        d.setDate(d.getDate() + 1)
+        return d.toISOString().split('T')[0]
+    }
+
+    const handleSaveManual = async () => {
+        if (!manualText.trim() || !customDate) return
+        setSaving(true)
+        try {
+            const token = await auth.currentUser?.getIdToken()
+            if (!token) throw new Error('Not authenticated')
+
+            const res = await fetch('/api/ai/letters_manual', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    letter: manualText,
+                    deliverAt: customDate,
+                }),
+            })
+
+            const data = await res.json()
+            if (!res.ok) throw new Error(data.error ?? 'Failed to save letter')
+
+            const newLetter: Letter = {
+                id: data.letterId,
+                letter: manualText,
+                deliverAt: customDate,
+                deliverIn: 0,
+                userNote: '',
+                opened: false,
+                createdAt: new Date(),
+            }
+            setLetters(prev => [newLetter, ...prev])
+            setWriting(false)
+            setManualText('')
+            setCustomDate('')
+            toast.success('✦ Letter sealed! Opens on ' + format(parseISO(customDate), 'MMM d, yyyy'))
+        } catch (e: any) {
+            toast.error(e.message ?? 'Failed to save')
+        } finally {
+            setSaving(false)
+        }
+    }
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-full">
@@ -153,87 +206,180 @@ export const LetterPage = () => {
                         ✦ Write your letter
                     </h2>
 
-                    {/* Delivery time */}
-                    <div className="mb-5">
-                        <label className="text-xs font-medium text-ink2 block mb-2">
-                            Deliver in
-                        </label>
-                        <div className="flex gap-2">
-                            {DELIVER_OPTIONS.map(opt => (
+                    {/* Mode tabs */}
+                    <div className="flex gap-1 bg-surface rounded-xl p-1 mb-5">
+                        <button
+                            onClick={() => setMode('ai')}
+                            className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${mode === 'ai'
+                                ? 'bg-card text-ink shadow-sm'
+                                : 'text-muted hover:text-ink'
+                                }`}
+                        >
+                            ✦ AI writes it for me
+                        </button>
+                        <button
+                            onClick={() => setMode('manual')}
+                            className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${mode === 'manual'
+                                ? 'bg-card text-ink shadow-sm'
+                                : 'text-muted hover:text-ink'
+                                }`}
+                        >
+                            ✏️ I'll write it myself
+                        </button>
+                    </div>
+
+                    {/* ── AI MODE ── */}
+                    {mode === 'ai' && (
+                        <>
+                            {/* Delivery time */}
+                            <div className="mb-5">
+                                <label className="text-xs font-medium text-ink2 block mb-2">
+                                    Deliver in
+                                </label>
+                                <div className="flex gap-2">
+                                    {DELIVER_OPTIONS.map(opt => (
+                                        <button
+                                            key={opt.value}
+                                            onClick={() => setDeliverIn(opt.value)}
+                                            className={`flex-1 py-2.5 px-3 rounded-xl border text-xs
+                                  transition-all text-center ${deliverIn === opt.value
+                                                    ? 'border-accent bg-accent-pale text-accent font-medium'
+                                                    : 'border-border text-muted hover:border-ink2/30 hover:text-ink'
+                                                }`}
+                                        >
+                                            <div className="font-medium">{opt.label}</div>
+                                            <div className="text-[10px] mt-0.5 opacity-70">{opt.desc}</div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Personal note */}
+                            <div className="mb-5">
+                                <label className="text-xs font-medium text-ink2 block mb-2">
+                                    Anything specific to include?{' '}
+                                    <span className="text-muted font-normal">(optional)</span>
+                                </label>
+                                <textarea
+                                    value={userNote}
+                                    onChange={e => setUserNote(e.target.value)}
+                                    placeholder="e.g. I'm nervous about my job interview next week..."
+                                    rows={2}
+                                    className="w-full px-3.5 py-2.5 rounded-xl border border-border
+                             bg-bg text-ink text-sm outline-none resize-none
+                             focus:border-accent transition-colors
+                             placeholder:text-muted leading-relaxed"
+                                />
+                            </div>
+
+                            <div className="bg-lav-pale rounded-xl p-3.5 border border-lav/20 mb-5">
+                                <p className="text-xs text-ink2 leading-relaxed">
+                                    <span className="text-lav font-medium">✦ How it works:</span> AI reads your recent
+                                    journal entries and writes a personal letter capturing this moment — to be opened on{' '}
+                                    <span className="font-medium text-ink">
+                                        {format(
+                                            new Date(new Date().setMonth(new Date().getMonth() + deliverIn)),
+                                            'MMMM d, yyyy'
+                                        )}
+                                    </span>.
+                                </p>
+                            </div>
+
+                            <div className="flex gap-3">
                                 <button
-                                    key={opt.value}
-                                    onClick={() => setDeliverIn(opt.value)}
-                                    className={`flex-1 py-2.5 px-3 rounded-xl border text-xs
-                              transition-all text-center ${deliverIn === opt.value
-                                            ? 'border-accent bg-accent-pale text-accent font-medium'
-                                            : 'border-border text-muted hover:border-ink2/30 hover:text-ink'
-                                        }`}
+                                    onClick={() => { setWriting(false); setUserNote('') }}
+                                    className="flex-1 py-2.5 border border-border rounded-xl
+                             text-sm text-muted hover:text-ink transition-colors"
                                 >
-                                    <div className="font-medium">{opt.label}</div>
-                                    <div className="text-[10px] mt-0.5 opacity-70">{opt.desc}</div>
+                                    Cancel
                                 </button>
-                            ))}
-                        </div>
-                    </div>
+                                <button
+                                    onClick={handleGenerate}
+                                    disabled={generating}
+                                    className="flex-1 py-2.5 bg-accent text-white rounded-xl
+                             text-sm font-medium hover:bg-accent-dark
+                             transition-colors disabled:opacity-50
+                             flex items-center justify-center gap-2"
+                                >
+                                    {generating ? (
+                                        <>
+                                            <span className="w-3.5 h-3.5 border-2 border-white/40
+                                       border-t-white rounded-full animate-spin" />
+                                            Writing your letter…
+                                        </>
+                                    ) : (
+                                        '✦ Seal & send to future me'
+                                    )}
+                                </button>
+                            </div>
+                        </>
+                    )}
 
-                    {/* Personal note */}
-                    <div className="mb-5">
-                        <label className="text-xs font-medium text-ink2 block mb-2">
-                            Anything specific you want to include? <span className="text-muted font-normal">(optional)</span>
-                        </label>
-                        <textarea
-                            value={userNote}
-                            onChange={e => setUserNote(e.target.value)}
-                            placeholder="e.g. I'm worried about my job interview next week..."
-                            rows={3}
-                            className="w-full px-3.5 py-2.5 rounded-xl border border-border
-                         bg-bg text-ink text-sm outline-none resize-none
-                         focus:border-accent transition-colors
-                         placeholder:text-muted leading-relaxed"
-                        />
-                    </div>
+                    {/* ── MANUAL MODE ── */}
+                    {mode === 'manual' && (
+                        <>
+                            {/* Letter textarea */}
+                            <div className="mb-5">
+                                <label className="text-xs font-medium text-ink2 block mb-2">
+                                    Write your letter
+                                </label>
+                                <textarea
+                                    value={manualText}
+                                    onChange={e => setManualText(e.target.value)}
+                                    placeholder={"Dear future me,I'm writing this on " + format(new Date(), 'MMMM d, yyyy') + "..."}
+                                    rows={8}
+                                    className="w-full px-3.5 py-2.5 rounded-xl border border-border
+                                bg-bg text-ink text-sm outline-none resize-none
+                                focus:border-accent transition-colors font-lora
+                                placeholder:text-muted leading-relaxed"
+                                />
+                                <div className="text-[10px] text-muted mt-1 text-right">
+                                    {manualText.trim().split(/\s+/).filter(Boolean).length} words
+                                </div>
+                            </div>
 
-                    <div className="bg-lav-pale rounded-xl p-3.5 border border-lav/20 mb-5">
-                        <p className="text-xs text-ink2 leading-relaxed">
-                            <span className="text-lav font-medium">✦ How it works:</span> AI reads your recent
-                            journal entries to understand your life right now, then writes a personal letter
-                            capturing this moment — to be opened on{' '}
-                            <span className="font-medium text-ink">
-                                {format(
-                                    new Date(new Date().setMonth(new Date().getMonth() + deliverIn)),
-                                    'MMMM d, yyyy'
+                            {/* Custom delivery date */}
+                            <div className="mb-5">
+                                <label className="text-xs font-medium text-ink2 block mb-2">
+                                    Deliver on
+                                </label>
+                                <input
+                                    type="date"
+                                    value={customDate}
+                                    min={minDate()}
+                                    onChange={e => setCustomDate(e.target.value)}
+                                    className="w-full px-3.5 py-2.5 rounded-xl border border-border
+                             bg-bg text-ink text-sm outline-none
+                             focus:border-accent transition-colors"
+                                />
+                                {customDate && (
+                                    <p className="text-[10px] text-muted mt-1">
+                                        This letter will be sealed until {format(parseISO(customDate), 'MMMM d, yyyy')}
+                                    </p>
                                 )}
-                            </span>.
-                        </p>
-                    </div>
+                            </div>
 
-                    <div className="flex gap-3">
-                        <button
-                            onClick={() => { setWriting(false); setUserNote('') }}
-                            className="flex-1 py-2.5 border border-border rounded-xl
-                         text-sm text-muted hover:text-ink transition-colors"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={handleGenerate}
-                            disabled={generating}
-                            className="flex-1 py-2.5 bg-accent text-white rounded-xl
-                         text-sm font-medium hover:bg-accent-dark
-                         transition-colors disabled:opacity-50
-                         flex items-center justify-center gap-2"
-                        >
-                            {generating ? (
-                                <>
-                                    <span className="w-3.5 h-3.5 border-2 border-white/40
-                                   border-t-white rounded-full animate-spin" />
-                                    Writing your letter…
-                                </>
-                            ) : (
-                                '✦ Seal & send to future me'
-                            )}
-                        </button>
-                    </div>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => { setWriting(false); setManualText(''); setCustomDate('') }}
+                                    className="flex-1 py-2.5 border border-border rounded-xl
+                             text-sm text-muted hover:text-ink transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleSaveManual}
+                                    disabled={saving || !manualText.trim() || !customDate}
+                                    className="flex-1 py-2.5 bg-ink text-bg rounded-xl
+                             text-sm font-medium hover:opacity-85
+                             transition-all disabled:opacity-40
+                             disabled:cursor-not-allowed"
+                                >
+                                    {saving ? 'Saving…' : '🔒 Seal letter'}
+                                </button>
+                            </div>
+                        </>
+                    )}
                 </div>
             )}
 
