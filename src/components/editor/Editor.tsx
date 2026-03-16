@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef } from 'react'
+import { useEffect, useCallback, useRef, useState } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -13,6 +13,7 @@ import TaskItem from '@tiptap/extension-task-item'
 import Image from '@tiptap/extension-image'
 import FontFamily from '@tiptap/extension-font-family'
 import { EditorToolbar } from './EditorToolbar'
+import { useVoice } from '@/hooks/useVoice'
 
 interface EditorProps {
     title: string
@@ -117,6 +118,23 @@ export const Editor = ({
         input.click()
     }, [editor])
 
+    // ── VOICE ────────────────────────────────────────────────────
+    const [showInterim, setShowInterim] = useState('')
+
+    const { status: voiceStatus, toggle: toggleVoice, isUnsupported } = useVoice({
+        onTranscript: (text) => {
+            if (!editor) return
+            // Insert transcript at current cursor position with a space
+            const textToInsert = text.trim() + ' '
+            editor.chain().focus().insertContent(textToInsert).run()
+            setShowInterim('')
+        },
+        onInterim: (text) => {
+            setShowInterim(text)
+        },
+        lang: 'en-IN',
+    })
+
     return (
         <div className={`transition-all duration-300 ${focusMode ? 'max-w-xl' : 'max-w-2xl'
             } mx-auto px-4 sm:px-6 py-6 sm:py-8`}>
@@ -140,8 +158,42 @@ export const Editor = ({
 
             {/* Toolbar — hidden in focus mode */}
             {editor && !focusMode && (
-                <div className="mb-3">
-                    <EditorToolbar editor={editor} onImageUpload={handleImageUpload} />
+                <div className="mb-3 flex items-center gap-2">
+                    <div className="flex-1">
+                        <EditorToolbar editor={editor} onImageUpload={handleImageUpload} />
+                    </div>
+
+                    {/* Mic button */}
+                    {!isUnsupported && (
+                        <button
+                            onClick={toggleVoice}
+                            title={voiceStatus === 'listening' ? 'Stop recording' : 'Voice to text'}
+                            className={`shrink-0 w-8 h-8 rounded-lg border flex items-center
+                          justify-center transition-all ${voiceStatus === 'listening'
+                                    ? 'bg-terra text-white border-terra animate-pulse'
+                                    : 'border-border text-muted hover:border-terra/40 hover:text-terra'
+                                }`}
+                        >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                                <line x1="12" y1="19" x2="12" y2="23" />
+                                <line x1="8" y1="23" x2="16" y2="23" />
+                            </svg>
+                        </button>
+                    )}
+                </div>
+            )}
+
+            {/* Live interim transcript */}
+            {voiceStatus === 'listening' && (
+                <div className="mb-3 px-3 py-2 bg-terra-pale border border-terra/20
+                        rounded-xl flex items-center gap-2">
+                    <span className="w-2 h-2 bg-terra rounded-full animate-pulse shrink-0" />
+                    <span className="text-xs text-terra italic">
+                        {showInterim || 'Listening… speak now'}
+                    </span>
                 </div>
             )}
 
