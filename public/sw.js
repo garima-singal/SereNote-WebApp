@@ -14,22 +14,20 @@ self.addEventListener('push', (event) => {
 
     const options = {
         body: data.body || 'Time to write in your journal ✦',
-        icon: data.icon || '/icon-192.png',
-        badge: data.badge || '/icon-192.png',
-        tag: data.tag || 'serenote-reminder',
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
+        tag: 'serenote-reminder',
         renotify: false,
         actions: [
             { action: 'write', title: '✦ Write now' },
             { action: 'dismiss', title: 'Later' },
         ],
-        data: {
-            url: data.url || '/',
-        }
+        data: { url: data.url || '/write' }
     }
 
     event.waitUntil(
         self.registration.showNotification(
-            data.title || 'SereNote — Daily Reminder',
+            data.title || 'SereNote ✦',
             options
         )
     )
@@ -39,27 +37,31 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
     event.notification.close()
 
-    const url = event.action === 'write'
-        ? '/write'
-        : (event.notification.data?.url || '/')
-
+    // Dismiss action — do nothing
     if (event.action === 'dismiss') return
+
+    // Always go to /write for "Write now", else home
+    const targetUrl = event.action === 'write' ? '/write' : '/'
+    const fullUrl = self.location.origin + targetUrl
 
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true })
             .then((clientList) => {
-                // If app is already open, focus it
+                // Check if any SereNote tab is already open
                 for (const client of clientList) {
-                    if (client.url.includes(self.location.origin) && 'focus' in client) {
-                        client.focus()
-                        client.navigate(url)
-                        return
+                    if ('focus' in client) {
+                        // Focus the existing tab and navigate it
+                        return client.focus().then(() => {
+                            if ('navigate' in client) {
+                                return client.navigate(fullUrl)
+                            }
+                            // Fallback — post a message to the client to navigate
+                            client.postMessage({ type: 'NAVIGATE', url: targetUrl })
+                        })
                     }
                 }
-                // Otherwise open a new window
-                if (clients.openWindow) {
-                    return clients.openWindow(url)
-                }
+                // No existing tab — open a new one
+                return clients.openWindow(fullUrl)
             })
     )
 })

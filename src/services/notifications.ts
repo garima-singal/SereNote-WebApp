@@ -138,6 +138,15 @@ const showReminderNotification = async () => {
 // ── INIT ──────────────────────────────────────────────────────
 // Call this on app start to restore scheduled reminders
 
+export const listenForNavigationMessages = (navigate: (path: string) => void): void => {
+    if (!('serviceWorker' in navigator)) return
+    navigator.serviceWorker.addEventListener('message', (event: MessageEvent) => {
+        if (event.data?.type === 'NAVIGATE' && event.data?.url) {
+            navigate(event.data.url as string)
+        }
+    })
+}
+
 export const initNotifications = async () => {
     if (!isNotificationSupported()) return
     if (Notification.permission !== 'granted') return

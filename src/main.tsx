@@ -1,9 +1,9 @@
-import { StrictMode } from 'react'
+import { StrictMode, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { RouterProvider } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { router } from './router'
-import { initNotifications } from './services/notifications'
+import { initNotifications, listenForNavigationMessages } from './services/notifications'
 
 // Init notifications on app load (restores scheduled reminders)
 initNotifications()
@@ -12,6 +12,14 @@ import './index.css'
 
 const App = () => {
     useAuth() // subscribe to Firebase auth state globally
+
+    // Listen for navigation messages from service worker (notification click)
+    useEffect(() => {
+        listenForNavigationMessages((path: string) => {
+            window.location.href = path
+        })
+    }, [])
+
     return (
         <>
             {/* Toaster at root level so toasts work on ALL pages including /auth */}
