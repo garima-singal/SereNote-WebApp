@@ -13,6 +13,7 @@ LIMITS = {
     "link":     10,   # Entry linking per day
     "chat":     30,   # Chat messages per day
     "letter":   2,    # Letters to future self per day
+    "tags":     30,   # Smart tag suggestions per day
 }
 
 _redis_client = None

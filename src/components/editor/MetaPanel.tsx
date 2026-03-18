@@ -23,6 +23,8 @@ export const MetaPanel = ({
     onTagsChange,
 }: MetaPanelProps) => {
     const [tagInput, setTagInput] = useState('')
+    const [tagSuggestions, setTagSuggestions] = useState<string[]>([])
+    const [tagsLoading, setTagsLoading] = useState(false)
     const [moodLoading, setMoodLoading] = useState(false)
     const [moodReasoning, setMoodReasoning] = useState('')
     const [moodError, setMoodError] = useState('')
@@ -73,6 +75,48 @@ export const MetaPanel = ({
         } finally {
             setMoodLoading(false)
         }
+    }
+
+    // ── AI TAG SUGGESTIONS ─────────────────────────────────────
+    const suggestTags = async () => {
+        if (!entryId || wordCount < 5) return
+        setTagsLoading(true)
+        setTagSuggestions([])
+        try {
+            const token = await auth.currentUser?.getIdToken()
+            if (!token) throw new Error('Not authenticated')
+
+            const res = await fetch('/api/ai/tags', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify({ entryId }),
+            })
+
+            const data = await res.json()
+            if (!res.ok) throw new Error(data.error ?? 'Failed to suggest tags')
+
+            // Filter out tags already added
+            const newSuggestions = (data.tags as string[]).filter(t => !tags.includes(t))
+            setTagSuggestions(newSuggestions)
+        } catch (e: any) {
+            console.error(e.message)
+        } finally {
+            setTagsLoading(false)
+        }
+    }
+
+    const acceptTag = (tag: string) => {
+        if (!tags.includes(tag) && tags.length < 10) {
+            onTagsChange([...tags, tag])
+        }
+        setTagSuggestions(prev => prev.filter(t => t !== tag))
+    }
+
+    const dismissTag = (tag: string) => {
+        setTagSuggestions(prev => prev.filter(t => t !== tag))
     }
 
     // Add tag on Enter or comma
@@ -184,8 +228,29 @@ export const MetaPanel = ({
 
             {/* ── TAGS ── */}
             <div>
-                <div className="text-[10px] font-semibold text-muted uppercase
-                        tracking-wider mb-2">Tags</div>
+                <div className="flex items-center justify-between mb-2">
+                    <div className="text-[10px] font-semibold text-muted uppercase tracking-wider">
+                        Tags
+                    </div>
+                    {aiOptIn && entryId && wordCount >= 5 && (
+                        <button
+                            onClick={suggestTags}
+                            disabled={tagsLoading}
+                            className="flex items-center gap-1 text-[10px] text-lav
+                         hover:text-lav/80 transition-colors disabled:opacity-50"
+                        >
+                            {tagsLoading ? (
+                                <>
+                                    <span className="w-2.5 h-2.5 border border-lav border-t-transparent
+                                   rounded-full animate-spin inline-block" />
+                                    Suggesting…
+                                </>
+                            ) : (
+                                <>✦ Suggest</>
+                            )}
+                        </button>
+                    )}
+                </div>
 
                 <div
                     onClick={() => inputRef.current?.focus()}
@@ -224,6 +289,38 @@ export const MetaPanel = ({
                 <div className="text-[10px] text-muted mt-1">
                     Press Enter or comma to add · {10 - tags.length} remaining
                 </div>
+
+                {/* AI suggested tags */}
+                {tagSuggestions.length > 0 && (
+                    <div className="mt-2">
+                        <div className="text-[10px] text-lav font-medium mb-1.5">
+                            ✦ Suggested tags
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                            {tagSuggestions.map(tag => (
+                                <div key={tag}
+                                    className="flex items-center gap-1 pl-2 pr-1 py-1
+                                bg-lav-pale border border-lav/20 rounded-lg">
+                                    <span className="text-[11px] text-lav">#{tag}</span>
+                                    <button
+                                        onClick={() => acceptTag(tag)}
+                                        title="Add tag"
+                                        className="w-4 h-4 rounded flex items-center justify-center
+                               text-lav hover:bg-lav hover:text-white
+                               transition-colors text-[10px] font-bold"
+                                    >+</button>
+                                    <button
+                                        onClick={() => dismissTag(tag)}
+                                        title="Dismiss"
+                                        className="w-4 h-4 rounded flex items-center justify-center
+                               text-lav/50 hover:bg-border hover:text-muted
+                               transition-colors text-[10px]"
+                                    >×</button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     )
