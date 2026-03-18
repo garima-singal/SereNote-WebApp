@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { useAuthStore } from '@/store/authStore'
 import { createEntry, updateEntry, getEntry } from '@/services/firebase/entries'
 import { auth } from '@/services/firebase/config'
+import { isOnline, savePendingEntry } from '@/services/offlineStorage'
 import { getUserProfile } from '@/services/firebase/users'
 import { useBookmark } from '@/hooks/useBookmark'
 import { Editor } from '@/components/editor/Editor'
@@ -143,9 +144,41 @@ export const WritePage = () => {
             } else {
                 setTimeout(() => setSaveStatus('idle'), 2000)
             }
-        } catch {
-            setSaveStatus('error')
-            toast.error('Failed to save entry.')
+        } catch (err) {
+            // If offline, save to IndexedDB for later sync
+            if (!isOnline()) {
+                try {
+                    const localId = id ?? `offline-${Date.now()}`
+                    await savePendingEntry({
+                        id: localId,
+                        uid: user.uid,
+                        title: t,
+                        body: b,
+                        bodyText: bt,
+                        moods: m,
+                        tags: tg,
+                        wordCount: wc,
+                        isNew: !id,
+                        savedAt: Date.now(),
+                    })
+                    if (!docId) setDocId(localId)
+                    setSaveStatus('saved')
+                    // Notify OfflineBanner about pending entry
+                    window.dispatchEvent(new Event('serenote:pending-update'))
+                    if (isManual) {
+                        toast.warning('Saved locally — will sync when online')
+                        setTimeout(() => navigate('/timeline'), 500)
+                    } else {
+                        setTimeout(() => setSaveStatus('idle'), 2000)
+                    }
+                } catch {
+                    setSaveStatus('error')
+                    toast.error('Failed to save entry.')
+                }
+            } else {
+                setSaveStatus('error')
+                toast.error('Failed to save entry.')
+            }
         }
     }, [user, navigate])
 
